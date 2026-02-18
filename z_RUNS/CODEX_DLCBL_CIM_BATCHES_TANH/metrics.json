@@ -1,0 +1,42 @@
+{
+  "train": {
+    "top1_accuracy": 0.7333208345608914,
+    "top2_accuracy": 0.8916126859989516,
+    "top1_balanced_accuracy": 0.8399682286129603,
+    "top2_balanced_accuracy": 0.9340300393690817,
+    "precision": 0.8084911514366898,
+    "f1": 0.75333211800067,
+    "n_samples": 261359
+  },
+  "val": {
+    "top1_accuracy": 0.5674543014127212,
+    "top2_accuracy": 0.7797583985940382,
+    "top1_balanced_accuracy": 0.530236533696769,
+    "top2_balanced_accuracy": 0.7011146194040762,
+    "precision": 0.7096054659215808,
+    "f1": 0.605716510348043,
+    "n_samples": 103559
+  },
+  "classes": [
+    "B",
+    "CD4T",
+    "CD4TNaive",
+    "DC",
+    "FDC",
+    "Granulo",
+    "MC",
+    "Macro",
+    "NK",
+    "NKT",
+    "PC",
+    "Stromal cells",
+    "TFH",
+    "TPR",
+    "TTOX",
+    "TTOXNaive",
+    "TTOX_exh",
+    "Treg"
+  ],
+  "n_classes": 18,
+  "feature_dim": 2560
+}

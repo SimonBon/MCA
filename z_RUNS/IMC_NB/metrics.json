@@ -1,0 +1,31 @@
+{
+  "train": {
+    "top1_accuracy": 0.8333975667432709,
+    "top2_accuracy": 0.9575774012589748,
+    "top1_balanced_accuracy": 0.8566745225064267,
+    "top2_balanced_accuracy": 0.9586082137706973,
+    "precision": 0.8840721160845351,
+    "f1": 0.8509899265145555,
+    "n_samples": 210171
+  },
+  "val": {
+    "top1_accuracy": 0.8265605222836586,
+    "top2_accuracy": 0.954999666910932,
+    "top1_balanced_accuracy": 0.8066051686882437,
+    "top2_balanced_accuracy": 0.9285191970993459,
+    "precision": 0.8771825886755491,
+    "f1": 0.8448455883697737,
+    "n_samples": 30022
+  },
+  "classes": [
+    "B_Cell",
+    "Myeloid",
+    "Other",
+    "Progenitor",
+    "Stromal",
+    "T_Cell",
+    "Tumor"
+  ],
+  "n_classes": 7,
+  "feature_dim": 992
+}

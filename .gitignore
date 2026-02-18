@@ -7,7 +7,11 @@ __pycache__/
 *.so
 
 other/
-z_RUNS/
+
+# z_RUNS: commit structure and small files, ignore large model/array files
+z_RUNS/**/*.pth
+z_RUNS/**/*.npy
+z_RUNS/**/*.npz
 
 # Distribution / packaging
 .Python

@@ -1,0 +1,40 @@
+{
+  "train": {
+    "top1_accuracy": 0.8523830007509533,
+    "top2_accuracy": 0.9504006299258525,
+    "top1_balanced_accuracy": 0.8779000359115405,
+    "top2_balanced_accuracy": 0.9657041439182692,
+    "precision": 0.8884280448190945,
+    "f1": 0.8628087686890922,
+    "n_samples": 137159
+  },
+  "val": {
+    "top1_accuracy": 0.839179047327309,
+    "top2_accuracy": 0.9449634961964568,
+    "top1_balanced_accuracy": 0.8434112114874124,
+    "top2_balanced_accuracy": 0.9472108841741114,
+    "precision": 0.8776244100857198,
+    "f1": 0.85062149718181,
+    "n_samples": 19587
+  },
+  "classes": [
+    "B",
+    "CD3 T",
+    "CD4 T",
+    "CD8 T",
+    "DC",
+    "DC/Mono",
+    "Endothelial",
+    "Keratin-positive tumor",
+    "Macrophages",
+    "Mesenchymal-like",
+    "Mono/Neu",
+    "NK",
+    "Neutrophils",
+    "Other immune",
+    "Tregs",
+    "Tumor"
+  ],
+  "n_classes": 16,
+  "feature_dim": 1184
+}
