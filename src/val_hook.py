@@ -212,6 +212,35 @@ class EvaluateModel(Hook):
         plt.tight_layout()
         plt.savefig(f'{runner.work_dir}/confusion_matrix.png', dpi=150, bbox_inches='tight')
         print(f"\nSaved confusion matrix to {runner.work_dir}/confusion_matrix.png")
+
+        # ============================================
+        # SAVE CONFUSION MATRICES AS JSON
+        # ============================================
+        classes = list(label_encoder.classes_)
+
+        def cm_to_dict(cm, classes):
+            return {
+                'classes': classes,
+                'matrix': {
+                    true_cls: {
+                        pred_cls: round(float(cm[i, j]), 4)
+                        for j, pred_cls in enumerate(classes)
+                    }
+                    for i, true_cls in enumerate(classes)
+                },
+                'per_class_recall': {
+                    cls: round(float(cm[i, i]), 4)
+                    for i, cls in enumerate(classes)
+                }
+            }
+
+        with open(f'{runner.work_dir}/confusion_matrix_train.json', 'w') as f:
+            json.dump(cm_to_dict(train_cm, classes), f, indent=2)
+
+        with open(f'{runner.work_dir}/confusion_matrix_val.json', 'w') as f:
+            json.dump(cm_to_dict(val_cm, classes), f, indent=2)
+
+        print(f"Saved confusion matrix JSON to {runner.work_dir}/confusion_matrix_{{train,val}}.json")
         
         # ============================================
         # SAVE TRAIN SPLIT (NUMPY ONLY)
