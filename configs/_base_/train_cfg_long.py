@@ -1,9 +1,9 @@
 
 n_linear = 500
 n_cosine = 9500
-lr = 0.3
+lr = 3e-4
 
-optimizer = dict(type='LARS', lr=lr, momentum=0.9, weight_decay=1e-5)
+optimizer = dict(type='AdamW', lr=lr, weight_decay=0.05)
 
 optim_wrapper = dict(
     type='OptimWrapper',
@@ -26,7 +26,7 @@ param_scheduler = [
     dict(
         type='CosineAnnealingLR',
         T_max=n_cosine,
-        eta_min=0.1 * lr,
+        eta_min=1e-6,
         by_epoch=False,
         begin=n_linear,
         end=n_linear + n_cosine,
