@@ -56,7 +56,7 @@ PATCH_SIZE        = int(_ns["patch_size"])   # 32
 
 ISILON     = "/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon"
 WORK_BASE  = f"{ISILON}/src/MCA/z_RUNS/HPO_CIM_VICReg_cHL"
-STUDY_DB   = f"sqlite:///{MCA_ROOT}/hpo_cHL.db"
+STUDY_DB   = f"sqlite:////home/simon_g/hpo_cHL.db"   # local disk, not NFS
 STUDY_NAME = "CIM_VICReg_cHL"
 
 # Fixed training budget per trial — keeps all trials comparable.
