@@ -19,12 +19,15 @@ All runs evaluated via linear probe (logistic regression, sklearn) on frozen fea
 | Run | Val Bal Acc | Notes |
 |-----|-------------|-------|
 | CIMATT_BYOL_SPATIAL_VP | **0.7333** | Best overall |
+| CIM_VICReg | 0.7302 | Clean baseline, high aug |
+| CIM_MCM_VICReg | 0.7242 | MCM auxiliary loss, slight regression |
 | CIM_MASK_VP (baseline) | 0.7240 | |
 | CIM_MASK_VP_LONG (10k iters) | 0.7229 | No gain from longer training |
 | CIMATT_MASK_VP | 0.7253 | |
 | CIMATT_VICReg_MASK_VP | 0.7149 | |
 | CIM_VICReg_LOW (low aug) | 0.7213 | Low aug ≈ no improvement |
 | CIM_DEEP_VICReg_MASK_VP | 0.6987 | Deeper backbone hurt |
+| ResNet_VICReg | 0.6215 | Early fusion baseline — **−10.9pp vs CIM** |
 | ATT_MASK_VP | 0.5327 | Attention-only poor |
 
 ### Key findings
@@ -52,6 +55,22 @@ CIM_MASK_VP_LONG (10k iters) vs CIM_MASK_VP (1k iters): +0.0009 balanced accurac
 
 **7. Marker identity is implicit via fixed channel positions.**
 The panel is fixed for each dataset, so depthwise conv weights per channel implicitly encode marker identity. No explicit marker embeddings are needed (unlike KRONOS which must handle panel-agnostic inputs).
+
+**9. CIM vs ResNet: channel separability gives +10.9pp balanced accuracy.**
+Direct comparison of parameter-matched CIM VICReg (0.730) vs ResNet VICReg (0.621) on CODEX_cHL. Early fusion hurts most on cell types requiring fine-grained single-marker discrimination:
+- Epithelial: +0.50 (ResNet collapses to CD4/Endothelial/Other)
+- Cytotoxic CD8: +0.29 (ResNet confuses with CD8 at 23.7%)
+- CD8: +0.20, Monocyte: +0.18, Lymphatic: +0.15
+- Neutrophil: 0.00 (strong unique marker — architecture doesn't matter)
+- B cells: ResNet marginally better (−0.02, dominant CD20 signal easy for any architecture)
+
+**10. MCM auxiliary loss does not improve over plain VICReg (−0.006).**
+CIM + MCM_VICReg (mask_ratio=0.3, mcm_coeff=0.1) scores 0.724 vs CIM + VICReg at 0.730. Losses on Cytotoxic CD8 (−0.026) and TReg (−0.024) outweigh gains on M1 (+0.013) and NK (+0.005). Likely causes:
+- `mcm_coeff=0.1` may be pulling backbone gradients away from the VICReg objective
+- Mean intensity reconstruction target may bias toward global intensity rather than discriminative patterns
+- With 70% of channels visible, MCM target may be trivially predictable, contributing noise rather than signal
+- Three backbone forward passes per step (VICReg ×2 + MCM ×1) may destabilize BatchNorm statistics
+This is a useful negative result — VICReg's variance/covariance regularization already captures channel relationships effectively. MCM in its current form is not complementary.
 
 **8. Annotation noise as a contributor to the ceiling.**
 Some model "errors" are likely annotation errors rather than model failures. The key evidence: CD4-labeled cells are predicted as B cells at 8% — but CD4 T cells and B cells have completely non-overlapping marker profiles (CD4/TCRb vs CD20), both present in the panel. A model seeing both channels should not confuse them, suggesting those cells are actually mislabeled B cells. Likely mechanisms in cHL CODEX: segmentation spillover in crowded tumor microenvironments, rule-based gating errors on borderline cells, and HRS cell rosette proximity causing mask-based misassignment. The model may be *more correct* than the annotation on these cells, meaning the true ceiling is slightly above 0.73.
