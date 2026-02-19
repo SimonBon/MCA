@@ -21,7 +21,8 @@ class MCIDataset(Dataset):
         pipeline=None,
         ignore_annotation=None,
         preprocess=None,
-        mask_patch=None):
+        mask_patch=None,
+        annotation_map=None):
         
         self.h5_filepath = Path(h5_filepath)
         self.patch_size = patch_size
@@ -32,6 +33,7 @@ class MCIDataset(Dataset):
         self.ignore_annotation = ignore_annotation
         self.preprocess=preprocess
         self.mask_patch=mask_patch
+        self.annotation_map = annotation_map or {}
         
         assert self.h5_filepath.exists(), f'{self.h5_filepath} does not exist!'
         
@@ -67,7 +69,10 @@ class MCIDataset(Dataset):
             self.DIM2 = self.DIM2[mask]
             self.sample_id = self.sample_id[mask]
             self.annotation = self.annotation[mask]
-            
+
+        if self.annotation_map:
+            self.annotation = np.array([self.annotation_map.get(a, a) for a in self.annotation])
+
         if self.ignore_annotation is not None:
             
             mask_keep = np.ones(len(self.annotation), dtype=bool)

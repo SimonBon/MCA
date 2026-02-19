@@ -27,17 +27,18 @@ from sklearn.preprocessing import LabelEncoder
 class EvaluateModel(Hook):
     
     def __init__(
-            self, 
-            dataset_kwargs: dict, 
-            train_indicies, 
-            val_indicies, 
-            pipeline, 
-            short=False, 
-            priority='VERY_LOW', 
-            epochs=1000): 
-        
+            self,
+            dataset_kwargs: dict,
+            train_indicies,
+            val_indicies,
+            pipeline,
+            short=False,
+            priority='VERY_LOW',
+            epochs=1000,
+            annotation_map=None):
+
         super().__init__()
-        
+
         self.dataset_kwargs = dataset_kwargs
 
         self.priority=priority
@@ -45,18 +46,20 @@ class EvaluateModel(Hook):
         self.val_indicies=val_indicies
         self.short=short
         self.epochs=epochs
-        
+
         base_dataset = dict(
             type='MCIDataset',
             pipeline=pipeline
         )
         base_dataset.update(self.dataset_kwargs)
-        
+        if annotation_map:
+            base_dataset['annotation_map'] = annotation_map
+
         print(base_dataset)
-        
+
         base_dataloader = dict(
             batch_size=32,
-            num_workers=16, 
+            num_workers=16,
             sampler=dict(type='DefaultSampler', shuffle=True),
             collate_fn=dict(type='default_collate'),
             drop_last=False,
@@ -67,7 +70,7 @@ class EvaluateModel(Hook):
         self.train_dataset['used_indicies'] = self.train_indicies
         self.train_dataloader = deepcopy(base_dataloader)
         self.train_dataloader['dataset'] = self.train_dataset
-    
+
         self.val_dataset = deepcopy(base_dataset)
         self.val_dataset['used_indicies'] = self.val_indicies
         self.val_dataloader = deepcopy(base_dataloader)
