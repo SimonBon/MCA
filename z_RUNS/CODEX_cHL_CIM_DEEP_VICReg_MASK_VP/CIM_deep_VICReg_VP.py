@@ -2,10 +2,10 @@ backbone = dict(
     block_width=2,
     drop_prob=0.05,
     in_channels=41,
-    late_fusion=False,
+    late_fusion=True,
     layer_config=[
-        1,
-        1,
+        2,
+        2,
     ],
     stem_width=32,
     type='WideModel')
@@ -25,6 +25,7 @@ custom_hooks = [
             used_markers=
             '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/data/MCI_data/h5_files/CODEX_cHL/used_markers.txt'
         ),
+        epochs=4000,
         pipeline=[
             dict(
                 n_views=[
@@ -100,17 +101,17 @@ log_processor = dict(
         dict(data_src='', method='mean', window_size='global'),
     ],
     window_size=1)
-lr = 0.3
+lr = 0.0003
 mask_patch = True
 model = dict(
     backbone=dict(
         block_width=2,
         drop_prob=0.05,
         in_channels=41,
-        late_fusion=False,
+        late_fusion=True,
         layer_config=[
-            1,
-            1,
+            2,
+            2,
         ],
         stem_width=32,
         type='WideModel'),
@@ -118,7 +119,7 @@ model = dict(
     data_preprocessor=None,
     gamma=1.0,
     neck=dict(
-        hid_channels=512,
+        hid_channels=1024,
         in_channels=1312,
         num_layers=2,
         out_channels=512,
@@ -127,24 +128,24 @@ model = dict(
     sim_coeff=25.0,
     std_coeff=25.0,
     type='MVVICReg')
-n_cosine = 1800
-n_linear = 200
+n_cosine = 9500
+n_linear = 500
 n_markers = 41
 num_workers = 16
 optim_wrapper = dict(
-    optimizer=dict(lr=0.3, momentum=0.9, type='LARS', weight_decay=1e-05),
+    optimizer=dict(lr=0.0003, type='AdamW', weight_decay=0.05),
     type='OptimWrapper')
-optimizer = dict(lr=0.3, momentum=0.9, type='LARS', weight_decay=1e-05)
+optimizer = dict(lr=0.0003, type='AdamW', weight_decay=0.05)
 param_scheduler = [
     dict(
-        begin=0, by_epoch=False, end=200, start_factor=0.0001,
+        begin=0, by_epoch=False, end=500, start_factor=0.0001,
         type='LinearLR'),
     dict(
-        T_max=1800,
-        begin=200,
+        T_max=9500,
+        begin=500,
         by_epoch=False,
-        end=2000,
-        eta_min=0.03,
+        end=10000,
+        eta_min=1e-06,
         type='CosineAnnealingLR'),
 ]
 patch_size = 32
@@ -156,44 +157,44 @@ train_aug_strong = [
     dict(
         angle=(
             0,
-            90,
+            360,
         ),
         order=1,
         scale=(
-            0.9,
-            1.1,
+            0.66,
+            1.5,
         ),
         shift=(
-            0,
-            0,
+            -0.1,
+            0.1,
         ),
         type='C_RandomAffine'),
     dict(
         clip=True,
         scale=(
-            0.8,
-            1.2,
+            0.33,
+            3,
         ),
         shift=(
-            -0.05,
-            0.05,
+            -0.15,
+            0.15,
         ),
         type='C_RandomChannelShiftScale'),
     dict(
         clip=True, strength=(
-            -0.05,
-            0.05,
+            -0.15,
+            0.15,
         ), type='C_RandomBackgroundGradient'),
     dict(clip=True, mean=(
         0,
         0,
     ), std=(
         0,
-        0.02,
+        0.05,
     ), type='C_RandomNoise'),
-    dict(copy_prob=0.02, type='C_RandomChannelCopy'),
-    dict(mixup_prob=0.02, type='C_RandomChannelMixup'),
-    dict(drop_prob=0.05, type='C_RandomChannelDrop'),
+    dict(copy_prob=0.05, type='C_RandomChannelCopy'),
+    dict(mixup_prob=0.05, type='C_RandomChannelMixup'),
+    dict(drop_prob=0.2, type='C_RandomChannelDrop'),
     dict(size=24, type='C_CentralCutter'),
     dict(type='C_ToTensor'),
 ]
@@ -202,12 +203,12 @@ train_aug_weak = [
     dict(
         angle=(
             0,
-            30,
+            360,
         ),
         order=1,
         scale=(
-            0.95,
-            1.05,
+            0.9,
+            1.1,
         ),
         shift=(
             0,
@@ -221,28 +222,28 @@ train_aug_weak = [
             1.1,
         ),
         shift=(
-            -0.02,
-            0.02,
+            -0.05,
+            0.05,
         ),
         type='C_RandomChannelShiftScale'),
     dict(clip=True, strength=(
         0.0,
-        0.02,
+        0.05,
     ), type='C_RandomBackgroundGradient'),
     dict(clip=True, mean=(
         0,
         0,
     ), std=(
         0,
-        0.01,
+        0.02,
     ), type='C_RandomNoise'),
-    dict(copy_prob=0.005, type='C_RandomChannelCopy'),
+    dict(copy_prob=0.01, type='C_RandomChannelCopy'),
     dict(mixup_prob=0.01, type='C_RandomChannelMixup'),
-    dict(drop_prob=0.02, type='C_RandomChannelDrop'),
+    dict(drop_prob=0.05, type='C_RandomChannelDrop'),
     dict(size=24, type='C_CentralCutter'),
     dict(type='C_ToTensor'),
 ]
-train_cfg = dict(max_iters=2000, type='IterBasedTrainLoop')
+train_cfg = dict(max_iters=10000, type='IterBasedTrainLoop')
 train_dataloader = dict(
     batch_size=256,
     collate_fn=dict(type='default_collate'),
@@ -270,34 +271,34 @@ train_dataloader = dict(
                         dict(
                             angle=(
                                 0,
-                                90,
+                                360,
                             ),
                             order=1,
                             scale=(
-                                0.9,
-                                1.1,
+                                0.66,
+                                1.5,
                             ),
                             shift=(
-                                0,
-                                0,
+                                -0.1,
+                                0.1,
                             ),
                             type='C_RandomAffine'),
                         dict(
                             clip=True,
                             scale=(
-                                0.8,
-                                1.2,
+                                0.33,
+                                3,
                             ),
                             shift=(
-                                -0.05,
-                                0.05,
+                                -0.15,
+                                0.15,
                             ),
                             type='C_RandomChannelShiftScale'),
                         dict(
                             clip=True,
                             strength=(
-                                -0.05,
-                                0.05,
+                                -0.15,
+                                0.15,
                             ),
                             type='C_RandomBackgroundGradient'),
                         dict(
@@ -308,12 +309,12 @@ train_dataloader = dict(
                             ),
                             std=(
                                 0,
-                                0.02,
+                                0.05,
                             ),
                             type='C_RandomNoise'),
-                        dict(copy_prob=0.02, type='C_RandomChannelCopy'),
-                        dict(mixup_prob=0.02, type='C_RandomChannelMixup'),
-                        dict(drop_prob=0.05, type='C_RandomChannelDrop'),
+                        dict(copy_prob=0.05, type='C_RandomChannelCopy'),
+                        dict(mixup_prob=0.05, type='C_RandomChannelMixup'),
+                        dict(drop_prob=0.2, type='C_RandomChannelDrop'),
                         dict(size=24, type='C_CentralCutter'),
                         dict(type='C_ToTensor'),
                     ],
@@ -326,12 +327,12 @@ train_dataloader = dict(
                         dict(
                             angle=(
                                 0,
-                                30,
+                                360,
                             ),
                             order=1,
                             scale=(
-                                0.95,
-                                1.05,
+                                0.9,
+                                1.1,
                             ),
                             shift=(
                                 0,
@@ -345,15 +346,15 @@ train_dataloader = dict(
                                 1.1,
                             ),
                             shift=(
-                                -0.02,
-                                0.02,
+                                -0.05,
+                                0.05,
                             ),
                             type='C_RandomChannelShiftScale'),
                         dict(
                             clip=True,
                             strength=(
                                 0.0,
-                                0.02,
+                                0.05,
                             ),
                             type='C_RandomBackgroundGradient'),
                         dict(
@@ -364,12 +365,12 @@ train_dataloader = dict(
                             ),
                             std=(
                                 0,
-                                0.01,
+                                0.02,
                             ),
                             type='C_RandomNoise'),
-                        dict(copy_prob=0.005, type='C_RandomChannelCopy'),
+                        dict(copy_prob=0.01, type='C_RandomChannelCopy'),
                         dict(mixup_prob=0.01, type='C_RandomChannelMixup'),
-                        dict(drop_prob=0.02, type='C_RandomChannelDrop'),
+                        dict(drop_prob=0.05, type='C_RandomChannelDrop'),
                         dict(size=24, type='C_CentralCutter'),
                         dict(type='C_ToTensor'),
                     ],
@@ -411,34 +412,34 @@ train_dataset = dict(
                     dict(
                         angle=(
                             0,
-                            90,
+                            360,
                         ),
                         order=1,
                         scale=(
-                            0.9,
-                            1.1,
+                            0.66,
+                            1.5,
                         ),
                         shift=(
-                            0,
-                            0,
+                            -0.1,
+                            0.1,
                         ),
                         type='C_RandomAffine'),
                     dict(
                         clip=True,
                         scale=(
-                            0.8,
-                            1.2,
+                            0.33,
+                            3,
                         ),
                         shift=(
-                            -0.05,
-                            0.05,
+                            -0.15,
+                            0.15,
                         ),
                         type='C_RandomChannelShiftScale'),
                     dict(
                         clip=True,
                         strength=(
-                            -0.05,
-                            0.05,
+                            -0.15,
+                            0.15,
                         ),
                         type='C_RandomBackgroundGradient'),
                     dict(
@@ -449,12 +450,12 @@ train_dataset = dict(
                         ),
                         std=(
                             0,
-                            0.02,
+                            0.05,
                         ),
                         type='C_RandomNoise'),
-                    dict(copy_prob=0.02, type='C_RandomChannelCopy'),
-                    dict(mixup_prob=0.02, type='C_RandomChannelMixup'),
-                    dict(drop_prob=0.05, type='C_RandomChannelDrop'),
+                    dict(copy_prob=0.05, type='C_RandomChannelCopy'),
+                    dict(mixup_prob=0.05, type='C_RandomChannelMixup'),
+                    dict(drop_prob=0.2, type='C_RandomChannelDrop'),
                     dict(size=24, type='C_CentralCutter'),
                     dict(type='C_ToTensor'),
                 ],
@@ -467,12 +468,12 @@ train_dataset = dict(
                     dict(
                         angle=(
                             0,
-                            30,
+                            360,
                         ),
                         order=1,
                         scale=(
-                            0.95,
-                            1.05,
+                            0.9,
+                            1.1,
                         ),
                         shift=(
                             0,
@@ -486,15 +487,15 @@ train_dataset = dict(
                             1.1,
                         ),
                         shift=(
-                            -0.02,
-                            0.02,
+                            -0.05,
+                            0.05,
                         ),
                         type='C_RandomChannelShiftScale'),
                     dict(
                         clip=True,
                         strength=(
                             0.0,
-                            0.02,
+                            0.05,
                         ),
                         type='C_RandomBackgroundGradient'),
                     dict(
@@ -505,12 +506,12 @@ train_dataset = dict(
                         ),
                         std=(
                             0,
-                            0.01,
+                            0.02,
                         ),
                         type='C_RandomNoise'),
-                    dict(copy_prob=0.005, type='C_RandomChannelCopy'),
+                    dict(copy_prob=0.01, type='C_RandomChannelCopy'),
                     dict(mixup_prob=0.01, type='C_RandomChannelMixup'),
-                    dict(drop_prob=0.02, type='C_RandomChannelDrop'),
+                    dict(drop_prob=0.05, type='C_RandomChannelDrop'),
                     dict(size=24, type='C_CentralCutter'),
                     dict(type='C_ToTensor'),
                 ],
@@ -542,34 +543,34 @@ train_pipeline = [
                 dict(
                     angle=(
                         0,
-                        90,
+                        360,
                     ),
                     order=1,
                     scale=(
-                        0.9,
-                        1.1,
+                        0.66,
+                        1.5,
                     ),
                     shift=(
-                        0,
-                        0,
+                        -0.1,
+                        0.1,
                     ),
                     type='C_RandomAffine'),
                 dict(
                     clip=True,
                     scale=(
-                        0.8,
-                        1.2,
+                        0.33,
+                        3,
                     ),
                     shift=(
-                        -0.05,
-                        0.05,
+                        -0.15,
+                        0.15,
                     ),
                     type='C_RandomChannelShiftScale'),
                 dict(
                     clip=True,
                     strength=(
-                        -0.05,
-                        0.05,
+                        -0.15,
+                        0.15,
                     ),
                     type='C_RandomBackgroundGradient'),
                 dict(
@@ -580,12 +581,12 @@ train_pipeline = [
                     ),
                     std=(
                         0,
-                        0.02,
+                        0.05,
                     ),
                     type='C_RandomNoise'),
-                dict(copy_prob=0.02, type='C_RandomChannelCopy'),
-                dict(mixup_prob=0.02, type='C_RandomChannelMixup'),
-                dict(drop_prob=0.05, type='C_RandomChannelDrop'),
+                dict(copy_prob=0.05, type='C_RandomChannelCopy'),
+                dict(mixup_prob=0.05, type='C_RandomChannelMixup'),
+                dict(drop_prob=0.2, type='C_RandomChannelDrop'),
                 dict(size=24, type='C_CentralCutter'),
                 dict(type='C_ToTensor'),
             ],
@@ -598,12 +599,12 @@ train_pipeline = [
                 dict(
                     angle=(
                         0,
-                        30,
+                        360,
                     ),
                     order=1,
                     scale=(
-                        0.95,
-                        1.05,
+                        0.9,
+                        1.1,
                     ),
                     shift=(
                         0,
@@ -617,15 +618,15 @@ train_pipeline = [
                         1.1,
                     ),
                     shift=(
-                        -0.02,
-                        0.02,
+                        -0.05,
+                        0.05,
                     ),
                     type='C_RandomChannelShiftScale'),
                 dict(
                     clip=True,
                     strength=(
                         0.0,
-                        0.02,
+                        0.05,
                     ),
                     type='C_RandomBackgroundGradient'),
                 dict(
@@ -636,12 +637,12 @@ train_pipeline = [
                     ),
                     std=(
                         0,
-                        0.01,
+                        0.02,
                     ),
                     type='C_RandomNoise'),
-                dict(copy_prob=0.005, type='C_RandomChannelCopy'),
+                dict(copy_prob=0.01, type='C_RandomChannelCopy'),
                 dict(mixup_prob=0.01, type='C_RandomChannelMixup'),
-                dict(drop_prob=0.02, type='C_RandomChannelDrop'),
+                dict(drop_prob=0.05, type='C_RandomChannelDrop'),
                 dict(size=24, type='C_CentralCutter'),
                 dict(type='C_ToTensor'),
             ],
@@ -678,4 +679,4 @@ visualizer = dict(
     vis_backends=[
         dict(type='LocalVisBackend'),
     ])
-work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/CODEX_cHL_CIM_VICReg_LOW_MASK_VP'
+work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/CODEX_cHL_CIM_DEEP_VICReg_MASK_VP'
