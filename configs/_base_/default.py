@@ -9,6 +9,7 @@ custom_imports = dict(
         'MCA.src.models',
         'MCA.src.models_attention',
         'MCA.src.models_early_fusion',
+        'MCA.src.MCM',
         'MCA.src.val_hook'
         ],
     allow_failed_imports=False,
