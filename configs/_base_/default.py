@@ -8,6 +8,7 @@ custom_imports = dict(
         'MCA.src.BYOL',
         'MCA.src.models',
         'MCA.src.models_attention',
+        'MCA.src.models_early_fusion',
         'MCA.src.val_hook'
         ],
     allow_failed_imports=False,
