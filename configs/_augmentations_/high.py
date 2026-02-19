@@ -6,7 +6,7 @@ train_aug_strong = [
     dict(type='C_RandomNoise', mean=(0, 0), std=(0, 0.05), clip=True),
     dict(type='C_RandomChannelCopy', copy_prob=0.05),
     dict(type='C_RandomChannelMixup', mixup_prob=0.05),
-    dict(type='C_RandomChannelDrop', drop_prob=0.2),
+    dict(type='C_RandomChannelDrop', drop_prob=0.1),
     dict(type='C_CentralCutter', size=None),
     dict(type='C_ToTensor')
 ]
@@ -19,7 +19,7 @@ train_aug_weak = [
     dict(type='C_RandomNoise', mean=(0, 0), std=(0, 0.02), clip=True),
     dict(type='C_RandomChannelCopy', copy_prob=0.01),
     dict(type='C_RandomChannelMixup', mixup_prob=0.01),
-    dict(type='C_RandomChannelDrop', drop_prob=0.05),
+    dict(type='C_RandomChannelDrop', drop_prob=0.025),
     dict(type='C_CentralCutter', size=None),
     dict(type='C_ToTensor')
 ]

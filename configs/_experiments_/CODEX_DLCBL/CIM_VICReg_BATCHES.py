@@ -2,11 +2,11 @@ from copy import deepcopy
 
 _base_ = [
     '../../_base_/default.py',
-    '../../_augmentations_/high.py',
+    '../../_base_/augmentations_high.py',
     '../../_base_/train_cfg.py',
     '../../_base_/val_cfg.py',
-    '../../_datasets_/CODEX_cHL.py',
-    '../../_backbones_/ResNet.py',
+    '../../_datasets_/CODEX_DLCBL_BATCHES.py',
+    '../../_backbones_/CIM.py',
     '../../_algorithms_/VICReg.py',
 ]
 
@@ -44,7 +44,6 @@ _base_.custom_hooks[0].dataset_kwargs = _base_.dataset_kwargs
 
 _base_.model.backbone = _base_.backbone
 _base_.model.backbone.in_channels = _base_.n_markers
-# ResNetBaseline output is base_width * 4 = 64 * 4 = 256, independent of n_markers
-_base_.model.neck.in_channels = 256
+_base_.model.neck.in_channels = _base_.n_markers * _base_.features_per_marker
 
-work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/CODEX_cHL_ResNet_VICReg'
+work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/CODEX_DLCBL_CIM_VICReg_BATCHES'
