@@ -2,26 +2,31 @@ from copy import deepcopy
 
 _base_ = [
     '../../_base_/default.py',
-    '../../_base_/augmentations_high.py',
+    '../../_augmentations_/high.py',
     '../../_base_/train_cfg.py',
     '../../_base_/val_cfg.py',
-    '../../_datasets_/IMC_NB.py',
-    '../../_backbones_/SSM.py',
-    '../../_algorithms_/SimCLR.py',
+    '../../_datasets_/CODEX_cHL.py',
+    '../../_backbones_/CIM.py',
+    '../../_algorithms_/VICReg.py',
 ]
 
-batch_size = 512
+batch_size = 256
 num_workers = 16
+mask_patch = True
 
 _base_.val_augmentation[0].size = _base_.cutter_size
 _base_.val_pipeline[0].transforms = [_base_.val_augmentation]
 
 _base_.train_aug_strong[-2].size = _base_.cutter_size
-_base_.train_pipeline[0].transforms = [_base_.train_aug_strong, _base_.train_aug_strong]
+_base_.train_aug_weak[-2].size = _base_.cutter_size
+_base_.train_pipeline[0].transforms = [_base_.train_aug_strong, _base_.train_aug_weak]
 
 train_dataset = deepcopy(_base_.dataset)
+train_dataset.update(_base_.dataset_kwargs)
+
 train_dataset['used_indicies'] = _base_.train_indicies
 train_dataset['pipeline'] = _base_.train_pipeline
+train_dataset['mask_patch'] = mask_patch
 
 train_dataloader = dict(
     batch_size=batch_size,
@@ -34,17 +39,11 @@ train_dataloader = dict(
 
 _base_.custom_hooks[0].train_indicies = _base_.train_indicies
 _base_.custom_hooks[0].val_indicies = _base_.val_indicies
-_base_.custom_hooks[0].h5_filepath = _base_.h5_filepath
-_base_.custom_hooks[0].patch_size = _base_.patch_size
-_base_.custom_hooks[0].used_markers = _base_.used_markers
 _base_.custom_hooks[0].pipeline = _base_.val_pipeline
-_base_.custom_hooks[0].ignore_annotation = _base_.ignore_annotation
+_base_.custom_hooks[0].dataset_kwargs = _base_.dataset_kwargs
 
 _base_.model.backbone = _base_.backbone
 _base_.model.backbone.in_channels = _base_.n_markers
 _base_.model.neck.in_channels = _base_.n_markers * _base_.features_per_marker
-_base_.model.neck.hid_channels = 64
-_base_.model.neck.out_channels = 64
-_base_.model.neck.num_layers = 1
 
-work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/IMC_NB'
+work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/CODEX_cHL_CIM_VICReg'
