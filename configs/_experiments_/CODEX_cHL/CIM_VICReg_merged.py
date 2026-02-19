@@ -34,6 +34,15 @@ train_dataset['pipeline'] = _base_.train_pipeline
 train_dataset['mask_patch'] = mask_patch
 train_dataset['annotation_map'] = annotation_map
 
+train_dataloader = dict(
+    batch_size=batch_size,
+    num_workers=num_workers,
+    sampler=dict(type='InfiniteSampler', shuffle=True),
+    collate_fn=dict(type='default_collate'),
+    drop_last=True,
+    dataset=train_dataset,
+)
+
 _base_.custom_hooks[0].train_indicies = _base_.train_indicies
 _base_.custom_hooks[0].val_indicies = _base_.val_indicies
 _base_.custom_hooks[0].pipeline = _base_.val_pipeline
