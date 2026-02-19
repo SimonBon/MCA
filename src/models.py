@@ -236,6 +236,14 @@ class WideModelAttention(nn.Module):
         )
         self.attn_norm = nn.LayerNorm(stem_width)
 
+        # FFN after attention: per-channel pointwise MLP (fix #2)
+        self.ffn_norm = nn.LayerNorm(stem_width)
+        self.ffn = nn.Sequential(
+            nn.Linear(stem_width, stem_width * 4),
+            nn.GELU(),
+            nn.Linear(stem_width * 4, stem_width),
+        )
+
     def forward(self, x: torch.Tensor, *args, **kwargs):
         """
         Args:
@@ -255,23 +263,25 @@ class WideModelAttention(nn.Module):
             "Check that stem_width hasn't changed between __init__ and forward."
         )
 
-        # Reshape to [B, C, D, H', W'] and compute per-channel spatial tokens.
+        # Compute per-channel tokens by spatial mean pooling.
         tokens = x.view(B, C, D, H, W).mean(dim=(-2, -1))   # [B, C, D]
-        tokens = self.attn_norm(tokens)                       # pre-norm
 
-        # MHA expects [S, B, D] (S = C here, sequence over channels).
-        tokens_t = tokens.transpose(0, 1)                     # [C, B, D]
+        # Self-attention across channel tokens (pre-norm, fix #2 ordering).
+        tokens_t = self.attn_norm(tokens).transpose(0, 1)    # [C, B, D]
         attn_out, _ = self.channel_attn(tokens_t, tokens_t, tokens_t)
-        tokens = tokens + attn_out.transpose(0, 1)            # [B, C, D], residual
+        tokens = tokens + attn_out.transpose(0, 1)            # residual [B, C, D]
 
-        # Gate the *spatial* feature map with attention-derived weights,
-        # then pool globally. This is the key fix vs. the original: we gate
-        # x (still spatial) before pooling, rather than gating an already-pooled tensor.
-        gates = torch.sigmoid(tokens)                             # [B, C, D]
-        gates_spatial = gates.view(B, CD, 1, 1)                  # broadcast over H', W'
-        x_gated = x * gates_spatial                              # [B, C*D, H', W']
+        # FFN with pre-norm and residual (fix #2).
+        tokens = tokens + self.ffn(self.ffn_norm(tokens))     # [B, C, D]
 
-        out = x_gated.mean(dim=(-2, -1)).view(B, CD, 1, 1)       # global avg pool
+        # Additive correction: broadcast attention output over spatial dims
+        # and add to the feature map (fix #1 + #3).
+        # This preserves all spatial information in x — unlike the previous
+        # sigmoid gate which suppressed the spatial map multiplicatively.
+        correction = tokens.view(B, CD, 1, 1)
+        x = x + correction                                    # [B, C*D, H', W']
+
+        out = x.mean(dim=(-2, -1)).view(B, CD, 1, 1)         # global avg pool
 
         return (out,)
 
