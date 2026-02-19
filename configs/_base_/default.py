@@ -5,6 +5,7 @@ custom_imports = dict(
         'MCA.src.transforms',
         'MCA.src.SimCLR',
         'MCA.src.VICReg',
+        'MCA.src.BYOL',
         'MCA.src.models',
         'MCA.src.models_attention',
         'MCA.src.val_hook'
