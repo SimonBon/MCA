@@ -308,11 +308,14 @@ def objective(trial):
 
     t0 = time.monotonic()
     verbose = trial.study.user_attrs.get("verbose", False)
+    gpu     = trial.study.user_attrs.get("gpu", "0")
+    env     = {**os.environ, "CUDA_VISIBLE_DEVICES": gpu}
     try:
         if verbose:
             proc = subprocess.Popen(
                 [sys.executable, "-c", runner_code],
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                env=env,
             )
             for line in proc.stdout:
                 print(f"  [{trial.number}] {line}", end="", flush=True)
@@ -322,6 +325,7 @@ def objective(trial):
             result = subprocess.run(
                 [sys.executable, "-c", runner_code],
                 timeout=7200, capture_output=True, text=True,
+                env=env,
             )
             rc = result.returncode
             if rc != 0:
@@ -405,6 +409,8 @@ def main():
     parser.add_argument("--work-base",  type=str,   default=WORK_BASE)
     parser.add_argument("--db",         type=str,   default=STUDY_DB,
                         help="SQLAlchemy storage URL")
+    parser.add_argument("--gpu",        type=str,   default="0",
+                        help="CUDA device id(s) passed to CUDA_VISIBLE_DEVICES (default: 0)")
     args = parser.parse_args()
 
     os.makedirs(args.work_base, exist_ok=True)
@@ -418,6 +424,7 @@ def main():
         sampler=optuna.samplers.TPESampler(seed=42, multivariate=True),
     )
     study.set_user_attr("verbose", args.verbose)
+    study.set_user_attr("gpu", args.gpu)
 
     if args.report:
         report(study)
