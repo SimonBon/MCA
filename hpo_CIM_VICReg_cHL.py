@@ -455,9 +455,9 @@ def sample_params(trial: optuna.Trial) -> dict:
         # ── CIM backbone ───────────────────────────────────────────────────
         stem_width   = trial.suggest_categorical("stem_width", [16, 32, 64]),
         drop_prob    = trial.suggest_float("drop_prob", 0.0, 0.2),
-        layer_config = trial.suggest_categorical(
-            "layer_config", [[1], [1, 1], [2, 2]]
-        ),
+        layer_config = json.loads(trial.suggest_categorical(
+            "layer_config", ["[1]", "[1,1]", "[2,2]"]
+        )),
         late_fusion  = trial.suggest_categorical("late_fusion", [False, True]),
 
         # ── VICReg loss ────────────────────────────────────────────────────
@@ -675,6 +675,8 @@ def report(study: optuna.Study) -> None:
 # ============================================================
 
 def main() -> None:
+    global HPO_WORK_BASE, _VERBOSE, _HPO_N_ITERS_CURRENT
+
     parser = argparse.ArgumentParser(
         description="HPO for CIM+VICReg on CODEX_cHL"
     )
@@ -729,7 +731,6 @@ def main() -> None:
     args = parser.parse_args()
 
     # Allow CLI overrides of module-level flags / paths
-    global HPO_WORK_BASE, _VERBOSE, _HPO_N_ITERS_CURRENT
     HPO_WORK_BASE         = args.work_base
     _VERBOSE              = args.verbose
     _HPO_N_ITERS_CURRENT  = args.n_iters if args.n_iters else HPO_N_ITERS
