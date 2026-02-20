@@ -37,7 +37,8 @@ class EvaluateModel(Hook):
             short=False,
             priority='VERY_LOW',
             epochs=1000,
-            annotation_map=None):
+            annotation_map=None,
+            max_samples=None):
 
         super().__init__()
 
@@ -48,6 +49,8 @@ class EvaluateModel(Hook):
         self.val_indicies=val_indicies
         self.short=short
         self.epochs=epochs
+        # max_samples overrides short; None = use short logic (25k cap)
+        self._max_samples = max_samples if max_samples is not None else (25_000 if short else float('inf'))
 
         base_dataset = dict(
             type='MCIDataset',
@@ -96,9 +99,8 @@ class EvaluateModel(Hook):
             train_features.extend(feats[0].detach().cpu().numpy())
             train_labels_str.extend(list(batch['data_samples']['annotation'][0]))
             train_sample_ids.extend(list(batch['data_samples']['sample_id'][0]))
-            if len(train_features) > 25_000: 
-                if self.short:
-                    break
+            if len(train_features) >= self._max_samples:
+                break
         
         train_features = np.array(train_features).squeeze()
         train_labels_str = np.array(train_labels_str)
@@ -110,9 +112,8 @@ class EvaluateModel(Hook):
             val_features.extend(feats[0].detach().cpu().numpy())
             val_labels_str.extend(list(batch['data_samples']['annotation'][0]))
             val_sample_ids.extend(list(batch['data_samples']['sample_id'][0]))
-            if len(val_features) > 25_000: 
-                if self.short:
-                    break
+            if len(val_features) >= self._max_samples:
+                break
             
         val_features = np.array(val_features).squeeze()
         val_labels_str = np.array(val_labels_str)

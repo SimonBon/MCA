@@ -1,6 +1,8 @@
+import os
+_debug = os.getenv('DEBUG', '').lower() in ('1', 'true', 'yes')
 
-n_linear = 200
-n_cosine = 800
+n_linear = 5   if _debug else 200
+n_cosine = 5   if _debug else 800
 lr = 3e-4
 
 optimizer = dict(type='AdamW', lr=lr, weight_decay=0.05)
