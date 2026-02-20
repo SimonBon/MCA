@@ -47,10 +47,8 @@ class EvaluateModel(Hook):
         self.priority=priority
         self.train_indicies=train_indicies
         self.val_indicies=val_indicies
-        self.short=short
         self.epochs=epochs
-        # max_samples overrides short; None = use short logic (25k cap)
-        self._max_samples = max_samples if max_samples is not None else (25_000 if short else float('inf'))
+        self._max_samples = max_samples if max_samples is not None else float('inf')
 
         base_dataset = dict(
             type='MCIDataset',

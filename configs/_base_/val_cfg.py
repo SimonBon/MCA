@@ -16,7 +16,6 @@ custom_hooks = [dict(
     train_indicies=None,
     val_indicies=None,
     dataset_kwargs=None,
-    short=False,
     max_samples=5000 if _debug else None,
     epochs=100   if _debug else 1000,
 )]
