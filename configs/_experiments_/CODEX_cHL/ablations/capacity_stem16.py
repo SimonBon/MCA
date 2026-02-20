@@ -53,4 +53,4 @@ _base_.model.backbone = dict(
 )
 _base_.model.neck.in_channels = _base_.n_markers * stem_width
 
-work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/CODEX_cHL_capacity_stem16'
+work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/CODEX_cHL_ablations/capacity_stem16'

@@ -56,4 +56,4 @@ _base_.model.backbone = _base_.backbone
 _base_.model.backbone.in_channels = _base_.n_markers
 _base_.model.neck.in_channels = _base_.n_markers * _base_.features_per_marker
 
-work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/CODEX_cHL_iters_500'
+work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/CODEX_cHL_ablations/iters_500'
