@@ -1,0 +1,41 @@
+{
+  "train": {
+    "top1_accuracy": 0.6917669983993319,
+    "top2_accuracy": 0.878697195351103,
+    "top1_balanced_accuracy": 0.7772859134326756,
+    "top2_balanced_accuracy": 0.9126881251283236,
+    "precision": 0.7380265461255427,
+    "f1": 0.6941955552034643,
+    "n_samples": 100583
+  },
+  "val": {
+    "top1_accuracy": 0.6620944158195238,
+    "top2_accuracy": 0.866662024787634,
+    "top1_balanced_accuracy": 0.7267062570605168,
+    "top2_balanced_accuracy": 0.887561106857337,
+    "precision": 0.7112702696758858,
+    "f1": 0.6668532350104093,
+    "n_samples": 14362
+  },
+  "classes": [
+    "B",
+    "CD4",
+    "CD8",
+    "Cytotoxic CD8",
+    "DC",
+    "Endothelial",
+    "Epithelial",
+    "Lymphatic",
+    "M1",
+    "M2",
+    "Mast",
+    "Monocyte",
+    "NK",
+    "Neutrophil",
+    "Other",
+    "TReg",
+    "Tumor"
+  ],
+  "n_classes": 17,
+  "feature_dim": 2624
+}

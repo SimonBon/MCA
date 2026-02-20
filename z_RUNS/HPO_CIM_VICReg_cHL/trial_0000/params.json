@@ -1,0 +1,9 @@
+{
+  "lr": 0.0005611516415334506,
+  "weight_decay": 0.07114476009343425,
+  "batch_size": 128,
+  "stem_width": 64,
+  "sim_coeff": 32.0501755284444,
+  "std_coeff": 36.86326600082205,
+  "aug_strategy": "high"
+}
