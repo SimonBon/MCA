@@ -1,5 +1,4 @@
 import os
-_debug = os.getenv('DEBUG', '').lower() in ('1', 'true', 'yes')
 
 val_augmentation = [
     dict(type='C_CentralCutter', size=None),
@@ -16,6 +15,6 @@ custom_hooks = [dict(
     train_indicies=None,
     val_indicies=None,
     dataset_kwargs=None,
-    max_samples=5000 if _debug else None,
-    epochs=100   if _debug else 1000,
+    max_samples=5000 if os.getenv('DEBUG', '').lower() in ('1', 'true', 'yes') else None,
+    epochs=100   if os.getenv('DEBUG', '').lower() in ('1', 'true', 'yes') else 1000,
 )]
