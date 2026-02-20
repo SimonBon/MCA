@@ -10,7 +10,7 @@ _base_ = [
     '../../../_algorithms_/VICReg.py',
 ]
 
-batch_size = 256
+batch_size = 128
 num_workers = 16
 mask_patch = True
 stem_width = 64
