@@ -9,6 +9,8 @@ import json
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, balanced_accuracy_score, confusion_matrix, ConfusionMatrixDisplay, precision_score
+import matplotlib
+matplotlib.use('Agg')  # non-interactive backend — required when running without a display (screen, ssh, etc.)
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import LabelEncoder
 
