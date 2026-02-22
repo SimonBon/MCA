@@ -10,7 +10,8 @@ custom_imports = dict(
         'MCA.src.models_attention',
         'MCA.src.models_early_fusion',
         'MCA.src.MCM',
-        'MCA.src.val_hook'
+        'MCA.src.val_hook',
+        'MCA.src.val_hook_rich',
         ],
     allow_failed_imports=False,
 )
