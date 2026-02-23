@@ -5,7 +5,7 @@ _base_ = [
     '../../_augmentations_/high.py',
     '../../_base_/train_cfg.py',
     '../../_base_/val_cfg.py',
-    '../../_datasets_/CODEX_DLBCL.py',
+    '../../_datasets_/CODEX_DLCBL.py',
     '../../_backbones_/ResNet.py',
     '../../_algorithms_/VICReg.py',
 ]
@@ -43,6 +43,7 @@ dataset_kwargs = dict(
 )
 
 _base_.custom_hooks[0].type = 'EvaluateModelRich'
+_base_.custom_hooks[0].n_jobs = 8
 _base_.custom_hooks[0].train_indicies = _base_.train_indicies
 _base_.custom_hooks[0].val_indicies = _base_.val_indicies
 _base_.custom_hooks[0].pipeline = _base_.val_pipeline

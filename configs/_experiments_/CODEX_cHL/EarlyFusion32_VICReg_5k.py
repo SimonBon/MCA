@@ -48,6 +48,7 @@ train_dataloader = dict(
 )
 
 _base_.custom_hooks[0].type = 'EvaluateModelRich'
+_base_.custom_hooks[0].n_jobs = 8
 _base_.custom_hooks[0].train_indicies = _base_.train_indicies
 _base_.custom_hooks[0].val_indicies = _base_.val_indicies
 _base_.custom_hooks[0].pipeline = _base_.val_pipeline
