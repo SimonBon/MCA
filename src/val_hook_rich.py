@@ -56,7 +56,8 @@ class EvaluateModelRich(Hook):
             annotation_map=None,
             max_samples=None,
             knn_k=15,
-            silhouette_max_samples=10_000):
+            silhouette_max_samples=10_000,
+            n_jobs=4):
 
         super().__init__()
 
@@ -67,6 +68,7 @@ class EvaluateModelRich(Hook):
         self._max_samples = max_samples if max_samples is not None else float('inf')
         self.knn_k = knn_k
         self.silhouette_max_samples = silhouette_max_samples
+        self.n_jobs = n_jobs
 
         base_dataset = dict(type='MCIDataset', pipeline=pipeline)
         base_dataset.update(dataset_kwargs)
@@ -158,7 +160,7 @@ class EvaluateModelRich(Hook):
         print("\n=== 1. Linear Probe ===")
         clf = LogisticRegression(
             solver='lbfgs', penalty='l2', max_iter=self.epochs,
-            class_weight='balanced', C=10, n_jobs=2, verbose=1,
+            class_weight='balanced', C=10, n_jobs=self.n_jobs, verbose=1,
         )
         clf.fit(train_feats, train_labels)
 
@@ -194,7 +196,7 @@ class EvaluateModelRich(Hook):
         # ── 2. k-NN ────────────────────────────────────────────────────────
         print(f"\n=== 2. k-NN (k={self.knn_k}, cosine, distance-weighted) ===")
         knn = KNeighborsClassifier(n_neighbors=self.knn_k, metric='cosine',
-                                   weights='distance', n_jobs=-1)
+                                   weights='distance', n_jobs=self.n_jobs)
         knn.fit(train_feats, train_labels)
         train_pred_knn = knn.predict(train_feats)
         val_pred_knn   = knn.predict(val_feats)
@@ -243,7 +245,7 @@ class EvaluateModelRich(Hook):
         # across classes. We therefore also report purity_lift = observed /
         # expected-by-chance, which normalises for class frequency.
         print(f"\n=== 4. Neighbourhood Purity (k={self.knn_k}) ===")
-        nbrs = NearestNeighbors(n_neighbors=self.knn_k + 1, metric='cosine', n_jobs=-1)
+        nbrs = NearestNeighbors(n_neighbors=self.knn_k + 1, metric='cosine', n_jobs=self.n_jobs)
         nbrs.fit(val_feats)
         _, nn_idx = nbrs.kneighbors(val_feats)
         # nn_idx[:, 0] is the point itself — skip it
