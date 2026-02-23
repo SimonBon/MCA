@@ -157,3 +157,79 @@ Extend `src/val_hook.py` (or a separate notebook) to run kNN and MLP evaluation 
 - `configs/_base_/train_cfg.py` / `train_cfg_long.py` — AdamW, lower eta_min
 - `src/val_hook.py` — added JSON confusion matrix output alongside PNG
 - Multiple experiment configs in `configs/_experiments_/CODEX_cHL/`
+
+---
+
+## 2026-02-23
+
+### EvaluateModelRich: comprehensive evaluation hook
+
+Replaced the simple linear-probe-only `EvaluateModel` hook with `EvaluateModelRich` (`src/val_hook_rich.py`), which runs six evaluations on frozen features at each validation step:
+
+1. **Linear probe** — LogisticRegression with `class_weight='balanced'`, reports balanced accuracy + macro F1
+2. **k-NN** — distance-weighted cosine k-NN (k=15), reports balanced accuracy
+3. **k-means** — NMI and ARI against ground-truth labels
+4. **Neighbourhood purity with lift** — for each cell, find 15 nearest neighbours and count same-class fraction; lift = observed / expected-by-chance (class frequency). Corrects for class imbalance so rare cell types are fairly evaluated.
+5. **Silhouette score** — mean silhouette in cosine distance space; captures how well-separated clusters are
+6. **UMAP + confusion matrix** — saved as PNGs each validation step
+
+Key parameters: `max_samples` (cap embeddings for speed), `n_jobs` (CPU parallelism for sklearn), `knn_k` (default 15).
+
+**Note on MLP probe**: An MLP probe was briefly added and removed. MLPClassifier has no `class_weight` parameter so without explicit `sample_weight` it optimises for majority-class accuracy, making results misleading. Decision: keep only the logistic regression linear probe with `class_weight='balanced'`.
+
+---
+
+### CODEX_cHL backbone comparison — full results
+
+All models trained with VICReg for 1k iterations (n_linear=100, n_cosine=900) on the CODEX_cHL dataset (41 markers, 14 cell types).
+
+| Model | Params | Bal. Acc | F1 | kNN Bal. Acc | NMI | ARI | Purity | Lift | Silhouette |
+|---|---|---|---|---|---|---|---|---|---|
+| CIM (WideModel) | 1.11M | **72.48%** | **0.667** | **52.5%** | **0.304** | **0.162** | **50.2%** | **10.13×** | **−0.003** |
+| EarlyFusion32 | 45.25M | 70.73% | 0.667 | 49.8% | 0.263 | 0.118 | 48.1% | 9.97× | −0.067 |
+| EarlyFusion16 | 11.43M | 69.14% | 0.656 | 50.4% | 0.247 | 0.110 | 48.3% | 9.85× | −0.074 |
+| EarlyFusion5 | 1.17M | 67.35% | 0.628 | 50.1% | 0.229 | 0.096 | 47.9% | 9.40× | −0.089 |
+| ResNet | 1.13M | 61.83% | 0.595 | 49.1% | 0.270 | 0.128 | 48.5% | 9.46× | −0.068 |
+
+### Key findings
+
+**1. CIM outperforms all EarlyFusion variants despite far fewer parameters.**
+EarlyFusion32 uses 45.25M parameters (standard O(C²) convolutions in the stem) vs CIM's 1.11M. CIM still wins on 7/8 metrics. The advantage of channel separability is not a capacity effect.
+
+**2. CIM silhouette score stands completely apart (−0.003 vs −0.07 range for all others).**
+A silhouette near 0 means class boundaries are nearly non-overlapping in cosine space. All EarlyFusion and ResNet models sit around −0.07, indicating substantially more cluster overlap. This is the strongest structural evidence that channel-separable embeddings are geometrically better organised.
+
+**3. EarlyFusion scales poorly: more parameters ≠ better features.**
+EarlyFusion32 > EarlyFusion16 > EarlyFusion5 on linear probe (as expected with more capacity), but all remain below CIM. Scaling standard convolutions in the stem does not close the gap created by early channel mixing.
+
+**4. ResNet underperforms its parameter-matched EarlyFusion5 counterpart (−5.52pp).**
+Both use early fusion and ~1.1M params, but the specific ResNet architecture is worse. This confirms EarlyFusion5 is a fairer comparison point for CIM than ResNet.
+
+**5. Neighbourhood purity lift confirms CIM's advantage on rare cell types.**
+Raw purity is biased by class frequency (common classes trivially dominate neighbours). Lift normalises by expected purity under random assignment. CIM achieves 10.13× lift vs 9.40–9.97× for EarlyFusion — rare cell types (Cytotoxic CD8, TReg, NK) are more purely clustered by CIM even at only 15 neighbours.
+
+**6. kNN balanced accuracy is consistently lower than linear probe balanced accuracy.**
+Across all models (CIM: 52.5% kNN vs 72.5% linear; EF32: 49.8% vs 70.7%), the linear probe significantly outperforms kNN. This indicates the embedding space is not metric-isotropic: a linear decision boundary extracts more information than raw cosine distance. The features are good but the decision boundaries are non-trivial. This validates continuing to use logistic regression as the primary evaluation.
+
+---
+
+### Infrastructure created this session
+
+- `src/val_hook_rich.py` — `EvaluateModelRich` hook (registered with mmengine HOOKS)
+- `configs/_backbones_/EarlyFusion_16.py` — EarlyFusion stem_width=16
+- `configs/_backbones_/EarlyFusion_32.py` — EarlyFusion stem_width=32
+- Experiment configs for all 4 datasets × 5 backbones:
+  - `configs/_experiments_/CODEX_cHL/` — CIM, ResNet, EarlyFusion5/16/32 (1k iters)
+  - `configs/_experiments_/CODEX_DLBCL/` — same set
+  - `configs/_experiments_/IMC_NB/` — same set
+  - `configs/_experiments_/MIBI_TNBC/` — same set
+- `configs/_experiments_/CODEX_cHL/EarlyFusion_{5/16/32}_VICReg_5k.py` — 5k-iteration EarlyFusion configs (n_linear=500, n_cosine=4500) for extended training comparison
+- `run_experiments.sh` — runs all 5 backbones for a given dataset consecutively (`bash run_experiments.sh CODEX_cHL`)
+
+---
+
+### Next steps
+
+- [ ] Run 5k EarlyFusion configs on server and compare to CIM 1k (does longer training close the gap?)
+- [ ] Run all backbone configs on CODEX_DLBCL, IMC_NB, MIBI_TNBC to test cross-dataset generalisation
+- [ ] Create CIM 5k config for fair long-training comparison

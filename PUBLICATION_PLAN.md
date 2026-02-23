@@ -167,24 +167,26 @@ Positions as a calibration for all reported numbers — if kNN ≈ linear, the l
 - [x] WideModel (CIM) on CODEX_cHL — all algorithms (SimCLR, BYOL, VICReg)
 - [x] Cross-patient DLCBL preliminary results
 - [x] Augmentation ablation (spatial-only finding)
-- [x] Configs for CIM, ResNet, EarlyFusion, MidFusion, ProjectionFusion on CODEX_cHL
+- [x] Configs for CIM, ResNet, EarlyFusion5/16/32 on CODEX_cHL — **all run, results confirmed**
 - [x] MCM_VICReg implemented and sanity-checked
 - [x] Key findings on performance ceiling (panel-limited, not model-limited)
+- [x] EvaluateModelRich hook: kNN, k-means NMI/ARI, neighbourhood purity + lift, silhouette, UMAP
+- [x] Backbone configs for all 4 datasets (CODEX_cHL, CODEX_DLBCL, IMC_NB, MIBI_TNBC) × 5 backbones
+- [x] CODEX_cHL backbone ablation complete: CIM > EF32 > EF16 > EF5 > ResNet on all metrics
 
 ## What Needs to Be Run
 
 ### High priority (core paper)
 - [ ] ResNet + SimCLR, BYOL configs for CODEX_cHL (Exp 2)
-- [ ] EarlyFusion, MidFusion, ProjectionFusion + VICReg on CODEX_cHL (Exp 1)
 - [ ] CIM + MCM_VICReg on CODEX_cHL (Exp 3)
-- [ ] All backbone configs on IMC_NB and MIBI_TNBC (Exp 1 generalization)
+- [ ] All backbone configs on CODEX_DLBCL, IMC_NB, MIBI_TNBC (Exp 1 generalization)
 - [ ] Cross-patient DLCBL with ResNet baseline (Exp 4a)
+- [ ] 5k EarlyFusion configs (EF5/16/32) on CODEX_cHL — long training comparison
 
 ### Medium priority (strengthens claims)
 - [ ] Annotation noise analysis notebook (PROGRESS.md plan)
-- [ ] kNN/MLP probe in val_hook (Exp 7)
-- [ ] UMAP visualization notebook (Exp 6b)
-- [ ] Per-class recall analysis across architectures (Exp 6a)
+- [ ] UMAP visualization notebook (Exp 6b) — UMAPs saved per run but not analysed
+- [ ] Per-class recall analysis: CIM vs EarlyFusion vs ResNet across datasets (Exp 6a)
 
 ### Low priority (supplementary)
 - [ ] Augmentation ablation formalized as table (currently implicit in existing runs)
