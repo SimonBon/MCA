@@ -238,6 +238,10 @@ class EvaluateModelRich(Hook):
               f"Val ARI: {metrics['clustering']['val']['ari']:.4f}")
 
         # ── 4. Neighbourhood Purity ────────────────────────────────────────
+        # Raw purity is biased against rare classes: a class with 1% prevalence
+        # has a random-chance purity of 1%, so raw numbers are not comparable
+        # across classes. We therefore also report purity_lift = observed /
+        # expected-by-chance, which normalises for class frequency.
         print(f"\n=== 4. Neighbourhood Purity (k={self.knn_k}) ===")
         nbrs = NearestNeighbors(n_neighbors=self.knn_k + 1, metric='cosine', n_jobs=-1)
         nbrs.fit(val_feats)
@@ -246,19 +250,34 @@ class EvaluateModelRich(Hook):
         neighbor_labels = val_labels[nn_idx[:, 1:]]            # (N, k)
         mean_purity = float(np.mean(neighbor_labels == val_labels[:, None]))
 
+        # class frequencies in val set (= expected purity by chance)
+        class_freq = np.bincount(val_labels, minlength=n_classes) / len(val_labels)
+
         per_class_purity = {}
         for c, cls in enumerate(classes):
             mask = val_labels == c
             if mask.sum() == 0:
                 continue
-            per_class_purity[cls] = float(np.mean(neighbor_labels[mask] == c))
+            observed  = float(np.mean(neighbor_labels[mask] == c))
+            expected  = float(class_freq[c])
+            lift      = observed / expected if expected > 0 else float('inf')
+            per_class_purity[cls] = {
+                'purity':          observed,
+                'expected_chance': expected,
+                'purity_lift':     lift,
+                'n_cells':         int(mask.sum()),
+            }
+
+        # mean lift (macro-average across classes)
+        mean_lift = float(np.mean([v['purity_lift'] for v in per_class_purity.values()]))
 
         metrics['neighbourhood_purity'] = {
             'k': self.knn_k,
-            'mean': mean_purity,
-            'per_class': per_class_purity,
+            'mean_purity': mean_purity,
+            'mean_lift':   mean_lift,
+            'per_class':   per_class_purity,
         }
-        print(f"  Mean neighbourhood purity: {mean_purity:.4f}")
+        print(f"  Mean neighbourhood purity: {mean_purity:.4f}  |  Mean lift: {mean_lift:.2f}x")
 
         # ── 5. Silhouette Score ────────────────────────────────────────────
         print(f"\n=== 5. Silhouette Score (cosine, "
@@ -370,7 +389,7 @@ class EvaluateModelRich(Hook):
 ║  Linear Probe  bal-acc  {lp['top1_balanced_accuracy']:.4f}   F1 {lp['f1']:.4f}  ║
 ║  k-NN (k={self.knn_k:2d})    bal-acc  {knn['top1_balanced_accuracy']:.4f}   F1 {knn['f1']:.4f}  ║
 ║  Clustering    NMI      {cl['nmi']:.4f}   ARI {cl['ari']:.4f} ║
-║  Nbhd purity           {mean_purity:.4f}                  ║
+║  Nbhd purity  raw {mean_purity:.4f}  lift {mean_lift:.2f}x           ║
 ║  Silhouette            {sil:.4f}                  ║
 ╚══════════════════════════════════════════════════╝
 """)
