@@ -1,20 +1,20 @@
 {
   "train": {
-    "top1_accuracy": 0.6883867055068948,
-    "top2_accuracy": 0.876649135539803,
-    "top1_balanced_accuracy": 0.7714965987790543,
-    "top2_balanced_accuracy": 0.9103580565934878,
-    "precision": 0.7346564537354536,
-    "f1": 0.6915247321281625,
+    "top1_accuracy": 0.6863485877335136,
+    "top2_accuracy": 0.8744718292355567,
+    "top1_balanced_accuracy": 0.770943819440435,
+    "top2_balanced_accuracy": 0.9097204808732577,
+    "precision": 0.733650640370792,
+    "f1": 0.6891240957617626,
     "n_samples": 100583
   },
   "val": {
-    "top1_accuracy": 0.6604929675532656,
-    "top2_accuracy": 0.8651998328923548,
-    "top1_balanced_accuracy": 0.7235011122261453,
-    "top2_balanced_accuracy": 0.888531599224388,
-    "precision": 0.7099864130095938,
-    "f1": 0.6655433278598464,
+    "top1_accuracy": 0.6614677621501184,
+    "top2_accuracy": 0.8663138838601866,
+    "top1_balanced_accuracy": 0.7267680619524876,
+    "top2_balanced_accuracy": 0.8896594117638729,
+    "precision": 0.7108288918512093,
+    "f1": 0.6664145825927325,
     "n_samples": 14362
   },
   "classes": [
