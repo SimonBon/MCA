@@ -324,7 +324,7 @@ class EvaluateModelRich(Hook):
             reducer = umap_lib.UMAP(
                 n_components=2, metric='cosine',
                 n_neighbors=15, min_dist=0.1,
-                verbose=True,
+                n_jobs=self.n_jobs, verbose=True,
             )
             # Fit on train to keep val structure honest
             reducer.fit(train_feats)
