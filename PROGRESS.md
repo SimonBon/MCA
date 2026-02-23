@@ -306,8 +306,26 @@ At ps128 the tumour cluster reaches 41% purity (vs 49% at ps64) because larger p
 **6. CD4 ubiquity reflects cHL biology.**
 CD4 T cells dominate almost every cluster as the second or third component. This is expected — CD4+ T cells are the most abundant cell type in cHL and are present in all compartments. The model correctly reflects this while still separating tumour, B-cell, stromal, and vascular regions.
 
-#### EarlyFusion32 5k training — in progress
-Run `CODEX_cHL_EarlyFusion32_VICReg_5k` reached iter 4750/5000 as of 2026-02-23. Metrics not yet available. Remaining question: does 5× longer training with EarlyFusion close the gap to CIM at 1k iters?
+#### EarlyFusion32 5k training — completed
+
+| Model | Iters | Bal. Acc | F1 | kNN | NMI | ARI | Purity | Lift | Silhouette |
+|---|---|---|---|---|---|---|---|---|---|
+| CIM | 1k | **72.48%** | **0.667** | **52.5%** | **0.304** | **0.162** | **50.2%** | 10.13× | **−0.003** |
+| EarlyFusion32 | 5k | 68.35% | 0.662 | 50.7% | 0.302 | 0.139 | 49.6% | **10.34×** | −0.006 |
+| EarlyFusion32 | 1k | 70.73% | 0.667 | 49.8% | 0.263 | 0.118 | 48.1% | 9.97× | −0.067 |
+
+**Key finding — longer training produces a structural reversal:**
+
+At 5k iterations, EarlyFusion32's linear probe accuracy *decreases* (70.7% → 68.4%) while its embedding structure dramatically improves:
+- Silhouette: −0.067 → −0.006 (nearly matches CIM's −0.003)
+- NMI: 0.263 → 0.302 (nearly matches CIM's 0.304)
+- Lift: 9.97× → 10.34× (actually *exceeds* CIM)
+
+This is a critical dissociation: **the linear probe and the cluster metrics are measuring different things.** EarlyFusion32 at 5k forms highly structured, geometrically compact clusters that are comparable to CIM — but they are not linearly separable. CIM achieves both good structure AND linear separability from the start at 1k iterations.
+
+This explains why kNN (50.7%) is a fairer evaluator for EarlyFusion than the linear probe (68.4%) — the gap to CIM shrinks from +4.1pp (linear) to +1.8pp (kNN) at 5k.
+
+**Interpretation:** EarlyFusion with sufficient training learns to separate cell types into compact embedding clusters, but the embedding geometry is curved/non-linear. CIM's depthwise structure imposes a prior that aligns with the data's intrinsic geometry, producing linearly separable representations without needing long training.
 
 ---
 

@@ -1,0 +1,11 @@
+features_per_marker = 64
+
+backbone = dict(
+    type='EarlyFusionModel',
+    in_channels=None,
+    stem_width=features_per_marker,
+    block_width=2,
+    layer_config=[1, 1],
+    late_fusion=False,
+    drop_prob=0.05,
+)
