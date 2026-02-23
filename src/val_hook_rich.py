@@ -7,8 +7,6 @@ import numpy as np
 import json
 
 from sklearn.linear_model import LogisticRegression
-from sklearn.neural_network import MLPClassifier
-from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.metrics import (
@@ -32,17 +30,16 @@ except ImportError:
 @HOOKS.register_module()
 class EvaluateModelRich(Hook):
     """
-    Drop-in replacement for EvaluateModel that runs five complementary
-    evaluations on the frozen representation:
+    Drop-in replacement for EvaluateModel with five complementary evaluations:
 
-        1. Linear probe  — standard SSL benchmark (logistic regression)
-        2. k-NN          — parameter-free, tests feature similarity structure
-        3. k-means       — unsupervised clustering quality (NMI / ARI)
+        1. Linear probe     — standard SSL benchmark (logistic regression)
+        2. k-NN             — parameter-free, tests feature similarity structure
+        3. k-means          — unsupervised clustering quality (NMI / ARI)
         4. Neighbourhood purity — fraction of k nearest neighbours sharing
                                   the same cell-type label
         5. Silhouette score — cluster compactness in cosine space
-        6. UMAP plot     — 2-D visualisation coloured by cell type (requires
-                           umap-learn; skipped gracefully if missing)
+        6. UMAP plot        — 2-D visualisation coloured by cell type (requires
+                              umap-learn; skipped gracefully if missing)
 
     metrics.json keeps the same top-level 'train'/'val' keys as EvaluateModel
     (from the linear probe) so existing downstream code still works.
@@ -195,8 +192,6 @@ class EvaluateModelRich(Hook):
         print(f"  Val balanced acc: {metrics['linear_probe']['val']['top1_balanced_accuracy']:.4f}")
 
         # ── 2. k-NN ────────────────────────────────────────────────────────
-        # weights='distance' softens majority-class dominance compared to
-        # uniform voting, though k-NN has no direct class_weight equivalent.
         print(f"\n=== 2. k-NN (k={self.knn_k}, cosine, distance-weighted) ===")
         knn = KNeighborsClassifier(n_neighbors=self.knn_k, metric='cosine',
                                    weights='distance', n_jobs=-1)
@@ -219,47 +214,8 @@ class EvaluateModelRich(Hook):
         }
         print(f"  Val balanced acc: {metrics['knn']['val']['top1_balanced_accuracy']:.4f}")
 
-        # ── 3. MLP Probe ───────────────────────────────────────────────────
-        # MLPClassifier has no class_weight param — use sample_weight instead,
-        # computed the same way sklearn's 'balanced' mode works internally.
-        print("\n=== 3. MLP Probe (256-hidden, relu, balanced sample weights) ===")
-        mlp = MLPClassifier(
-            hidden_layer_sizes=(256,),
-            activation='relu',
-            max_iter=self.epochs,
-            early_stopping=True,
-            validation_fraction=0.1,
-            n_iter_no_change=20,
-            random_state=42,
-            verbose=False,
-        )
-        train_sample_weights = compute_sample_weight('balanced', train_labels)
-        mlp.fit(train_feats, train_labels, sample_weight=train_sample_weights)
-        train_pred_mlp = mlp.predict(train_feats)
-        val_pred_mlp   = mlp.predict(val_feats)
-
-        metrics['mlp_probe'] = {
-            'hidden_layer_sizes': (256,),
-            'train': {
-                'top1_accuracy':          float(accuracy_score(train_labels, train_pred_mlp)),
-                'top1_balanced_accuracy': float(balanced_accuracy_score(train_labels, train_pred_mlp)),
-                'f1':                     float(f1_score(train_labels, train_pred_mlp, average='weighted')),
-                'n_samples':              len(train_feats),
-            },
-            'val': {
-                'top1_accuracy':          float(accuracy_score(val_labels, val_pred_mlp)),
-                'top1_balanced_accuracy': float(balanced_accuracy_score(val_labels, val_pred_mlp)),
-                'f1':                     float(f1_score(val_labels, val_pred_mlp, average='weighted')),
-                'n_samples':              len(val_feats),
-            },
-        }
-        mlp_gap = (metrics['mlp_probe']['val']['top1_balanced_accuracy']
-                   - metrics['linear_probe']['val']['top1_balanced_accuracy'])
-        print(f"  Val balanced acc: {metrics['mlp_probe']['val']['top1_balanced_accuracy']:.4f}  "
-              f"(gap vs linear: {mlp_gap:+.4f})")
-
-        # ── 5. k-means → NMI / ARI ────────────────────────────────────────
-        print(f"\n=== 5. k-means Clustering (k={n_classes}) ===")
+        # ── 3. k-means → NMI / ARI ────────────────────────────────────────
+        print(f"\n=== 3. k-means Clustering (k={n_classes}) ===")
         all_feats  = np.concatenate([train_feats, val_feats])
         all_labels = np.concatenate([train_labels, val_labels])
         km = MiniBatchKMeans(n_clusters=n_classes, n_init=10, random_state=42, max_iter=300)
@@ -281,8 +237,8 @@ class EvaluateModelRich(Hook):
         print(f"  Val NMI: {metrics['clustering']['val']['nmi']:.4f}  |  "
               f"Val ARI: {metrics['clustering']['val']['ari']:.4f}")
 
-        # ── 6. Neighbourhood Purity ────────────────────────────────────────
-        print(f"\n=== 6. Neighbourhood Purity (k={self.knn_k}) ===")
+        # ── 4. Neighbourhood Purity ────────────────────────────────────────
+        print(f"\n=== 4. Neighbourhood Purity (k={self.knn_k}) ===")
         nbrs = NearestNeighbors(n_neighbors=self.knn_k + 1, metric='cosine', n_jobs=-1)
         nbrs.fit(val_feats)
         _, nn_idx = nbrs.kneighbors(val_feats)
@@ -304,8 +260,8 @@ class EvaluateModelRich(Hook):
         }
         print(f"  Mean neighbourhood purity: {mean_purity:.4f}")
 
-        # ── 7. Silhouette Score ────────────────────────────────────────────
-        print(f"\n=== 7. Silhouette Score (cosine, "
+        # ── 5. Silhouette Score ────────────────────────────────────────────
+        print(f"\n=== 5. Silhouette Score (cosine, "
               f"max {self.silhouette_max_samples} samples) ===")
         n_sil   = min(self.silhouette_max_samples, len(val_feats))
         sil_idx = np.random.default_rng(42).choice(len(val_feats), n_sil, replace=False)
@@ -314,7 +270,7 @@ class EvaluateModelRich(Hook):
         metrics['silhouette'] = {'score': sil, 'n_samples': n_sil, 'metric': 'cosine'}
         print(f"  Silhouette: {sil:.4f}")
 
-        # ── 8. Confusion Matrix (linear probe) ────────────────────────────
+        # ── 6. Confusion Matrix (linear probe) ────────────────────────────
         val_pred_str_lr = le.inverse_transform(val_pred_lr)
         val_cm = confusion_matrix(val_labels_str, val_pred_str_lr,
                                   labels=classes, normalize='true')
@@ -326,7 +282,6 @@ class EvaluateModelRich(Hook):
         plt.savefig(f'{work_dir}/confusion_matrix.png', dpi=150, bbox_inches='tight')
         plt.close()
 
-        # also save as JSON
         def _cm_to_dict(cm, cls_list):
             return {
                 'classes': cls_list,
@@ -342,7 +297,7 @@ class EvaluateModelRich(Hook):
         with open(f'{work_dir}/confusion_matrix_val.json', 'w') as f:
             json.dump(_cm_to_dict(val_cm, classes), f, indent=2)
 
-        # ── 9. UMAP ───────────────────────────────────────────────────────
+        # ── 7. UMAP ───────────────────────────────────────────────────────
         if HAS_UMAP:
             print("\n=== 7. UMAP ===")
             reducer = umap_lib.UMAP(
@@ -406,19 +361,17 @@ class EvaluateModelRich(Hook):
 
         # ── Summary print ──────────────────────────────────────────────────
         lp  = metrics['linear_probe']['val']
-        mlp = metrics['mlp_probe']['val']
         knn = metrics['knn']['val']
         cl  = metrics['clustering']['val']
         print(f"""
-╔══════════════════════════════════════════════════════╗
-║              Evaluation Summary (Val)                ║
-╠══════════════════════════════════════════════════════╣
-║  Linear Probe  bal-acc  {lp['top1_balanced_accuracy']:.4f}   F1 {lp['f1']:.4f}      ║
-║  MLP Probe     bal-acc  {mlp['top1_balanced_accuracy']:.4f}   F1 {mlp['f1']:.4f}  gap {mlp_gap:+.4f} ║
-║  k-NN (k={self.knn_k:2d})    bal-acc  {knn['top1_balanced_accuracy']:.4f}   F1 {knn['f1']:.4f}      ║
-║  Clustering    NMI      {cl['nmi']:.4f}   ARI {cl['ari']:.4f}         ║
-║  Nbhd purity           {mean_purity:.4f}                        ║
-║  Silhouette            {sil:.4f}                        ║
-╚══════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════╗
+║              Evaluation Summary (Val)            ║
+╠══════════════════════════════════════════════════╣
+║  Linear Probe  bal-acc  {lp['top1_balanced_accuracy']:.4f}   F1 {lp['f1']:.4f}  ║
+║  k-NN (k={self.knn_k:2d})    bal-acc  {knn['top1_balanced_accuracy']:.4f}   F1 {knn['f1']:.4f}  ║
+║  Clustering    NMI      {cl['nmi']:.4f}   ARI {cl['ari']:.4f} ║
+║  Nbhd purity           {mean_purity:.4f}                  ║
+║  Silhouette            {sil:.4f}                  ║
+╚══════════════════════════════════════════════════╝
 """)
         print(f"Saved metrics to {work_dir}/metrics.json")
