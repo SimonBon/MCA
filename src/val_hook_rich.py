@@ -8,6 +8,7 @@ import json
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
+from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.metrics import (
@@ -194,8 +195,11 @@ class EvaluateModelRich(Hook):
         print(f"  Val balanced acc: {metrics['linear_probe']['val']['top1_balanced_accuracy']:.4f}")
 
         # ── 2. k-NN ────────────────────────────────────────────────────────
-        print(f"\n=== 2. k-NN (k={self.knn_k}, cosine) ===")
-        knn = KNeighborsClassifier(n_neighbors=self.knn_k, metric='cosine', n_jobs=-1)
+        # weights='distance' softens majority-class dominance compared to
+        # uniform voting, though k-NN has no direct class_weight equivalent.
+        print(f"\n=== 2. k-NN (k={self.knn_k}, cosine, distance-weighted) ===")
+        knn = KNeighborsClassifier(n_neighbors=self.knn_k, metric='cosine',
+                                   weights='distance', n_jobs=-1)
         knn.fit(train_feats, train_labels)
         train_pred_knn = knn.predict(train_feats)
         val_pred_knn   = knn.predict(val_feats)
@@ -216,7 +220,9 @@ class EvaluateModelRich(Hook):
         print(f"  Val balanced acc: {metrics['knn']['val']['top1_balanced_accuracy']:.4f}")
 
         # ── 3. MLP Probe ───────────────────────────────────────────────────
-        print("\n=== 3. MLP Probe (256-hidden, relu) ===")
+        # MLPClassifier has no class_weight param — use sample_weight instead,
+        # computed the same way sklearn's 'balanced' mode works internally.
+        print("\n=== 3. MLP Probe (256-hidden, relu, balanced sample weights) ===")
         mlp = MLPClassifier(
             hidden_layer_sizes=(256,),
             activation='relu',
@@ -227,7 +233,8 @@ class EvaluateModelRich(Hook):
             random_state=42,
             verbose=False,
         )
-        mlp.fit(train_feats, train_labels)
+        train_sample_weights = compute_sample_weight('balanced', train_labels)
+        mlp.fit(train_feats, train_labels, sample_weight=train_sample_weights)
         train_pred_mlp = mlp.predict(train_feats)
         val_pred_mlp   = mlp.predict(val_feats)
 
