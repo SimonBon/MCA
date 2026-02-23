@@ -220,7 +220,7 @@ class EvaluateModelRich(Hook):
         print(f"\n=== 3. k-means Clustering (k={n_classes}) ===")
         all_feats  = np.concatenate([train_feats, val_feats])
         all_labels = np.concatenate([train_labels, val_labels])
-        km = MiniBatchKMeans(n_clusters=n_classes, n_init=10, random_state=42, max_iter=300)
+        km = MiniBatchKMeans(n_clusters=n_classes, n_init=10, max_iter=300)
         km.fit(all_feats)
         val_clusters = km.predict(val_feats)
         all_clusters = km.predict(all_feats)
@@ -285,7 +285,7 @@ class EvaluateModelRich(Hook):
         print(f"\n=== 5. Silhouette Score (cosine, "
               f"max {self.silhouette_max_samples} samples) ===")
         n_sil   = min(self.silhouette_max_samples, len(val_feats))
-        sil_idx = np.random.default_rng(42).choice(len(val_feats), n_sil, replace=False)
+        sil_idx = np.random.default_rng().choice(len(val_feats), n_sil, replace=False)
         sil     = float(silhouette_score(val_feats[sil_idx], val_labels[sil_idx],
                                          metric='cosine'))
         metrics['silhouette'] = {'score': sil, 'n_samples': n_sil, 'metric': 'cosine'}
@@ -324,7 +324,7 @@ class EvaluateModelRich(Hook):
             reducer = umap_lib.UMAP(
                 n_components=2, metric='cosine',
                 n_neighbors=15, min_dist=0.1,
-                random_state=42, verbose=True,
+                verbose=True,
             )
             # Fit on train to keep val structure honest
             reducer.fit(train_feats)
