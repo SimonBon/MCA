@@ -230,6 +230,99 @@ Across all models (CIM: 52.5% kNN vs 72.5% linear; EF32: 49.8% vs 70.7%), the li
 
 ### Next steps
 
-- [ ] Run 5k EarlyFusion configs on server and compare to CIM 1k (does longer training close the gap?)
+- [ ] Run 5k EarlyFusion configs on server and compare to CIM 1k (does longer training close the gap?) — EarlyFusion32_5k at iter 4750/5000 as of 2026-02-23, metrics pending
 - [ ] Run all backbone configs on CODEX_DLBCL, IMC_NB, MIBI_TNBC to test cross-dataset generalisation
 - [ ] Create CIM 5k config for fair long-training comparison
+
+---
+
+## 2026-02-23 (continued) — Region Analysis
+
+### Pipeline
+
+Unsupervised tissue region discovery using the trained CIM backbone (`notebooks/region_analysis.ipynb`):
+1. Sliding-window patches extracted from full tissue images (no cell-level processing)
+2. Each patch embedded by the frozen CIM backbone (AdaptiveAvgPool accepts any spatial size)
+3. PCA (64 components) → MiniBatchKMeans over k ∈ {2, 4, 8, 12, 16}
+4. Clusters interpreted by the cell-type composition of patches (cells assigned by centre coordinate)
+5. Outputs: UMAP, spatial tissue maps, composition bar charts, per-sample pies
+
+Two patch sizes run: **ps64** (64×64px, 62,499 patches) and **ps128** (128×128px, 15,500 patches), both with 50% overlap stride.
+
+---
+
+### Results — CODEX_cHL region clustering
+
+#### k=2 (both patch sizes — identical structure)
+
+The most fundamental split in the tumour microenvironment:
+
+| Cluster | Top cell types | Interpretation |
+|---|---|---|
+| C0 | Tumor 17–19%, NK 10–11%, DC | **Tumour niche** — Reed-Sternberg cell-enriched regions with innate immune infiltration |
+| C1 | CD4 29–30%, CD8 15%, B 14% | **Lymphoid zone** — mixed T and B cell areas |
+
+The tumour/lymphoid dichotomy is consistent across patch sizes, confirming it is a real tissue-level structure and not an artefact of resolution.
+
+#### k=4 — stromal/vascular compartment emerges
+
+| Cluster | Top cell types | Interpretation |
+|---|---|---|
+| Tumor cluster | Tumor 28–33%, NK 13%, DC 12% | Tumour niche |
+| B-rich cluster | CD4 32%, B 22%, CD8 15% | B cell follicle remnant |
+| T cell zone | CD4 26–30%, CD8 13% | Interfollicular T cell area |
+| Stromal/Other | CD4 20%, Other 17%, M2 15%, Endothelial | **Stromal compartment** — connective tissue + macrophages |
+
+#### k=8 — most informative granularity
+
+| Cluster | Top cell types | Interpretation |
+|---|---|---|
+| Pure tumour | Tumor 41–49%, DC 11%, NK 9% | Dense Reed-Sternberg niche |
+| Tumour-immune border | Tumor 17–20%, NK 17%, DC 13% | Tumour-infiltrating immune zone |
+| B follicle | B 35%, CD4 26% | B cell follicle with follicular helper T cells |
+| CD4 T zone | CD4 38%, CD8 17–19% | T cell-rich interfollicular area |
+| CD4+B mixed | CD4 29–36%, B 15–22% | Follicle mantle / mixed zone |
+| NK/Monocyte | CD4 30%, NK 11%, Monocyte 10% | Innate immune-enriched area |
+| Endothelial | Endothelial 24%, CD4 18% | Vascular/perivascular regions |
+| Stromal/M2 | Other 21–23%, M2 14%, CD4 20% | Stromal + M2 macrophage regions |
+
+#### Key biological observations
+
+**1. Tumour niche is robustly recovered at all k.**
+A cluster with >20% Tumor cells (rising to 48–59% at high k) is present at every granularity. It co-localises with DC and NK cells — consistent with the known Reed-Sternberg cell microenvironment in classical Hodgkin lymphoma where HRS cells recruit a characteristic inflammatory infiltrate.
+
+**2. B cell follicle structure is preserved.**
+A B-cell-rich cluster (B=23–40%) appears from k≥4, always co-localising with CD4 T cells (follicular helper T cells). This is consistent with residual follicular architecture in cHL tissue, where HRS cells often arise in or near germinal centres.
+
+**3. Multiple distinct T-cell zone types.**
+At k≥8 the model separates: (a) pure CD4 T zones, (b) CD4+CD8 mixed zones, (c) CD4+B follicular zones. This mirrors known compartmentalisation of T-cells in lymph node architecture.
+
+**4. Innate immune regions are distinct from adaptive zones.**
+NK+Monocyte+DC regions cluster separately from pure T-cell zones at k≥8, suggesting spatially organised innate immune responses that the embedding captures.
+
+**5. ps64 vs ps128 give consistent cluster identities.**
+At ps128 the tumour cluster reaches 41% purity (vs 49% at ps64) because larger patches include more surrounding cells. Both patch sizes recover the same biological structures, suggesting the CIM features encode genuine tissue-level context even in a model trained only on single cells.
+
+**6. CD4 ubiquity reflects cHL biology.**
+CD4 T cells dominate almost every cluster as the second or third component. This is expected — CD4+ T cells are the most abundant cell type in cHL and are present in all compartments. The model correctly reflects this while still separating tumour, B-cell, stromal, and vascular regions.
+
+#### EarlyFusion32 5k training — in progress
+Run `CODEX_cHL_EarlyFusion32_VICReg_5k` reached iter 4750/5000 as of 2026-02-23. Metrics not yet available. Remaining question: does 5× longer training with EarlyFusion close the gap to CIM at 1k iters?
+
+---
+
+### Infrastructure created (region analysis)
+
+- `notebooks/region_analysis.ipynb` — full region analysis notebook
+  - Lazy HDF5 loading: one sequential read per sample, numpy slicing for patches
+  - float16 embeddings (~165 MB vs 330 MB float32)
+  - Reverse cell assignment: O(N_cells × 4) vs old O(N_patches × N_cells)
+  - Auto-scales BATCH_SIZE with patch area to avoid CUDA tensor size limits
+  - Saves results to `z_RUNS/region_analysis/ps{PATCH_SIZE}/k_{k}/`
+
+### Next steps
+
+- [ ] Evaluate EarlyFusion32 5k once training completes
+- [ ] Run region analysis with CIM vs EarlyFusion embeddings and compare spatial structure
+- [ ] Try larger patch sizes (ps256) for coarser region-level features
+- [ ] Quantify reproducibility: do the same clusters appear across patients?
