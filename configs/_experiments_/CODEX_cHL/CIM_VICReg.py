@@ -11,7 +11,7 @@ _base_ = [
 ]
 
 batch_size = 256
-num_workers = 16
+num_workers = 8
 mask_patch = True
 
 _base_.val_augmentation[0].size = _base_.cutter_size
