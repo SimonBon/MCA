@@ -286,6 +286,136 @@ class WideModelAttention(nn.Module):
         return (out,)
 
 
+@MODELS.register_module()
+class WideModelAttentionLateFusion(nn.Module):
+    """
+    WideModelAttention followed by a late-fusion 1x1 conv before global pooling.
+
+    Flow:
+        per-marker depthwise stems
+        → grouped conv blocks (per-marker independent)
+        → self-attention across marker tokens (additive correction to spatial map)
+        → 1x1 conv mixing all C*D channels on the spatial map   ← late fusion
+        → global average pool → [B, C*D, 1, 1]
+
+    The attention provides input-dependent cross-marker context; the late-fusion
+    conv then performs a full linear mix of all marker channels on the
+    attention-corrected spatial feature map before pooling.
+
+    Args:
+        in_channels:  Number of input markers.
+        stem_width:   Expansion factor per marker in the stem (D).
+        block_width:  FFN expansion ratio inside ConvBlocks.
+        layer_config: Number of ConvBlocks per stage (AvgPool between stages).
+        drop_prob:    Dropout probability.
+        n_heads:      Attention heads (must divide stem_width evenly).
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        stem_width: int = 16,
+        block_width: int = 4,
+        layer_config: Optional[List[int]] = None,
+        drop_prob: float = 0.05,
+        n_heads: int = 4,
+    ):
+        super().__init__()
+
+        if layer_config is None:
+            layer_config = [2, 2]
+
+        assert stem_width % n_heads == 0, (
+            f"stem_width ({stem_width}) must be divisible by n_heads ({n_heads})"
+        )
+
+        self.in_channels = in_channels
+        self.stem_width = stem_width
+        self.stem_out_channels = in_channels * stem_width
+
+        # Per-marker depthwise stem.
+        self.stem = nn.Sequential(
+            nn.Conv2d(
+                in_channels,
+                self.stem_out_channels,
+                kernel_size=3,
+                padding=1,
+                groups=in_channels,
+                bias=False,
+            ),
+            nn.BatchNorm2d(self.stem_out_channels),
+            nn.ReLU(inplace=True),
+        )
+
+        # Grouped conv blocks — per-marker independent.
+        layers = []
+        for n_blocks in layer_config:
+            for _ in range(n_blocks):
+                layers.append(
+                    ConvBlock(
+                        in_channels=self.stem_out_channels,
+                        groups=in_channels,
+                        block_width=block_width,
+                        drop_prob=drop_prob,
+                    )
+                )
+            layers.append(nn.AvgPool2d(kernel_size=2, stride=2))
+        self.layers = nn.Sequential(*layers)
+
+        # Self-attention across marker tokens.
+        self.channel_attn = nn.MultiheadAttention(
+            embed_dim=stem_width,
+            num_heads=n_heads,
+            dropout=drop_prob,
+        )
+        self.attn_norm = nn.LayerNorm(stem_width)
+        self.ffn_norm = nn.LayerNorm(stem_width)
+        self.ffn = nn.Sequential(
+            nn.Linear(stem_width, stem_width * 4),
+            nn.GELU(),
+            nn.Linear(stem_width * 4, stem_width),
+        )
+
+        # Late fusion: 1x1 conv mixing all C*D channels on the spatial map.
+        self.late_fusion = nn.Conv2d(
+            self.stem_out_channels,
+            self.stem_out_channels,
+            kernel_size=1,
+        )
+
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+
+    def forward(self, x: torch.Tensor, *args, **kwargs):
+        """
+        Args:
+            x: [B, in_channels, H, W]
+        Returns:
+            Tuple containing a single tensor of shape [B, in_channels * stem_width, 1, 1].
+        """
+        x = self.stem(x)      # [B, C*D, H, W]
+        x = self.layers(x)    # [B, C*D, H', W']
+
+        B, CD, H, W = x.shape
+        C = self.in_channels
+        D = self.stem_width
+
+        # Attention correction across marker tokens.
+        tokens = x.view(B, C, D, H, W).mean(dim=(-2, -1))    # [B, C, D]
+        tokens_t = self.attn_norm(tokens).transpose(0, 1)     # [C, B, D]
+        attn_out, _ = self.channel_attn(tokens_t, tokens_t, tokens_t)
+        tokens = tokens + attn_out.transpose(0, 1)            # [B, C, D]
+        tokens = tokens + self.ffn(self.ffn_norm(tokens))     # [B, C, D]
+
+        correction = tokens.view(B, CD, 1, 1)
+        x = x + correction                                    # [B, C*D, H', W']
+
+        # Late fusion: mix all C*D channels on the spatial map before pooling.
+        x = self.late_fusion(x)                               # [B, C*D, H', W']
+
+        x = self.avgpool(x)                                   # [B, C*D, 1, 1]
+        return (x,)
+
+
 class ConvBlock(nn.Module):
     """
     Depthwise-separable ConvNeXt-style block with an FFN and skip connection.
