@@ -1,19 +1,21 @@
 import torch
+import torch.nn.functional as F
 from torch import nn
 from mmengine.registry import MODELS
 
 @MODELS.register_module()
 class WideModel(nn.Module):
     
-    def __init__(self, in_channels, stem_width=16, block_width=4, layer_config=[2, 2], drop_prob=0.05, late_fusion=False):
+    def __init__(self, in_channels, stem_width=16, block_width=4, layer_config=[2, 2], drop_prob=0.05, late_fusion=False, input_norm=False):
         super().__init__()
-        
+
         self.in_channels = in_channels
         self.stem_width = stem_width
         self.block_width = block_width
         self.stem_out_channels = in_channels * self.stem_width
         self.layer_config = layer_config
         self.drop_prob=drop_prob
+        self.input_norm = input_norm
         
         self.stem = nn.Sequential(
             nn.Conv2d(
@@ -60,9 +62,12 @@ class WideModel(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x, *args, **kwargs):
-        
+
+        if self.input_norm:
+            x = F.normalize(x, dim=1)
+
         try:
-        
+
             x = self.stem(x)
             x = self.layers(x)
             x = self.avgpool(x)
