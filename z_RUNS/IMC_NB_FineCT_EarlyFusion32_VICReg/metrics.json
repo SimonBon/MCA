@@ -16,118 +16,118 @@
   "feature_dim": 992,
   "linear_probe": {
     "train": {
-      "top1_accuracy": 0.8313780727820013,
-      "top2_accuracy": 0.9664116466638367,
-      "top1_balanced_accuracy": 0.9157761990690717,
-      "top2_balanced_accuracy": 0.9823033487456327,
-      "precision": 0.8640806011677306,
-      "f1": 0.8394083246173862,
+      "top1_accuracy": 0.8315131401227184,
+      "top2_accuracy": 0.9667782580172114,
+      "top1_balanced_accuracy": 0.916356620546986,
+      "top2_balanced_accuracy": 0.9826971064126474,
+      "precision": 0.8639155085892203,
+      "f1": 0.8394567373387112,
       "n_samples": 207304
     },
     "val": {
-      "top1_accuracy": 0.8186545994866946,
-      "top2_accuracy": 0.9610630825341078,
-      "top1_balanced_accuracy": 0.8372435001801262,
-      "top2_balanced_accuracy": 0.9481825067247791,
-      "precision": 0.8529341713031131,
-      "f1": 0.828141953844063,
+      "top1_accuracy": 0.821491287315953,
+      "top2_accuracy": 0.9610293124409023,
+      "top1_balanced_accuracy": 0.820918967463373,
+      "top2_balanced_accuracy": 0.9380414319421806,
+      "precision": 0.8540688472071392,
+      "f1": 0.8306678199699037,
       "n_samples": 29612
     }
   },
   "knn": {
     "k": 15,
     "val": {
-      "top1_accuracy": 0.836856679724436,
-      "top1_balanced_accuracy": 0.6507647230911172,
-      "f1": 0.8345208714031167
+      "top1_accuracy": 0.839288126435229,
+      "top1_balanced_accuracy": 0.6548243909179828,
+      "f1": 0.8370916425075362
     }
   },
   "clustering": {
     "method": "MiniBatchKMeans(k=11, n_init=10)",
     "val": {
-      "nmi": 0.26806122267308796,
-      "ari": 0.1547222571719716
+      "nmi": 0.28403672806663555,
+      "ari": 0.15232932857241593
     },
     "all": {
-      "nmi": 0.267131671223022,
-      "ari": 0.15458929594055112
+      "nmi": 0.2804563956796177,
+      "ari": 0.151151699068576
     }
   },
   "neighbourhood_purity": {
     "k": 15,
-    "mean_purity": 0.7537349723085236,
-    "mean_lift": 49.5693729291753,
+    "mean_purity": 0.7547345670674052,
+    "mean_lift": 51.076636979675506,
     "per_class": {
       "B_Cell": {
-        "purity": 0.7914555389965227,
+        "purity": 0.7872826626924988,
         "expected_chance": 0.022659732540861812,
-        "purity_lift": 34.92784116358425,
+        "purity_lift": 34.743687343741094,
         "n_cells": 671
       },
       "CD4_T": {
-        "purity": 0.2954462659380692,
+        "purity": 0.30127504553734064,
         "expected_chance": 0.006179927056598676,
-        "purity_lift": 47.807403426000576,
+        "purity_lift": 48.75058277842476,
         "n_cells": 183
       },
       "CD8_T": {
-        "purity": 0.5389698736637513,
+        "purity": 0.5306122448979592,
         "expected_chance": 0.011583141969471836,
-        "purity_lift": 46.53054197939068,
+        "purity_lift": 45.809008151365504,
         "n_cells": 343
       },
       "Myeloid": {
-        "purity": 0.5780940060370849,
+        "purity": 0.5682621819749892,
         "expected_chance": 0.026104282047818454,
-        "purity_lift": 22.14556236322142,
+        "purity_lift": 21.768925915450687,
         "n_cells": 773
       },
       "NK_DC": {
-        "purity": 0.11515151515151516,
+        "purity": 0.12121212121212122,
         "expected_chance": 0.0003714710252600297,
-        "purity_lift": 309.9878787878788,
+        "purity_lift": 326.3030303030303,
         "n_cells": 11
       },
       "Neutrophil": {
-        "purity": 0.5394714407502131,
+        "purity": 0.550383631713555,
         "expected_chance": 0.013204106443333783,
-        "purity_lift": 40.85633837211077,
+        "purity_lift": 41.682762409979006,
         "n_cells": 391
       },
       "Progenitor": {
-        "purity": 0.1588342440801457,
+        "purity": 0.15664845173041894,
         "expected_chance": 0.006179927056598676,
-        "purity_lift": 25.70163735355888,
+        "purity_lift": 25.347945096399812,
         "n_cells": 183
       },
       "Proliferating": {
-        "purity": 0.6098408710217755,
+        "purity": 0.620854271356784,
         "expected_chance": 0.10752397676617588,
-        "purity_lift": 5.671673326852015,
+        "purity_lift": 5.774100717153607,
         "n_cells": 3184
       },
       "Stromal": {
-        "purity": 0.7499089726918076,
+        "purity": 0.7552319029042046,
         "expected_chance": 0.1298460083749831,
-        "purity_lift": 5.775371781365359,
+        "purity_lift": 5.8163659580752425,
         "n_cells": 3845
       },
       "T_Cell": {
-        "purity": 0.7097621440536014,
+        "purity": 0.7078860971524288,
         "expected_chance": 0.1680062136971498,
-        "purity_lift": 4.224618414013115,
+        "purity_lift": 4.213451881181451,
         "n_cells": 4975
       },
       "Tumor": {
-        "purity": 0.8307491308487788,
+        "purity": 0.830195531344804,
         "expected_chance": 0.508341213021748,
-        "purity_lift": 1.6342352529525035,
+        "purity_lift": 1.6331462216290662,
         "n_cells": 15053
       }
     }
   },
   "silhouette": {
-    "score": 0.042725399136543274,
+    "score": 0.03487506881356239,
     "n_samples": 10000,
     "metric": "cosine"
   },
@@ -138,21 +138,21 @@
     "metric": "cosine"
   },
   "train": {
-    "top1_accuracy": 0.8313780727820013,
-    "top2_accuracy": 0.9664116466638367,
-    "top1_balanced_accuracy": 0.9157761990690717,
-    "top2_balanced_accuracy": 0.9823033487456327,
-    "precision": 0.8640806011677306,
-    "f1": 0.8394083246173862,
+    "top1_accuracy": 0.8315131401227184,
+    "top2_accuracy": 0.9667782580172114,
+    "top1_balanced_accuracy": 0.916356620546986,
+    "top2_balanced_accuracy": 0.9826971064126474,
+    "precision": 0.8639155085892203,
+    "f1": 0.8394567373387112,
     "n_samples": 207304
   },
   "val": {
-    "top1_accuracy": 0.8186545994866946,
-    "top2_accuracy": 0.9610630825341078,
-    "top1_balanced_accuracy": 0.8372435001801262,
-    "top2_balanced_accuracy": 0.9481825067247791,
-    "precision": 0.8529341713031131,
-    "f1": 0.828141953844063,
+    "top1_accuracy": 0.821491287315953,
+    "top2_accuracy": 0.9610293124409023,
+    "top1_balanced_accuracy": 0.820918967463373,
+    "top2_balanced_accuracy": 0.9380414319421806,
+    "precision": 0.8540688472071392,
+    "f1": 0.8306678199699037,
     "n_samples": 29612
   }
 }
