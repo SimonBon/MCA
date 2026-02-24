@@ -340,6 +340,28 @@ class EvaluateModelRich(Hook):
             plt.close()
             print(f"Saved UMAP to {work_dir}/umap.png")
 
+            # UMAP coloured by sample ID
+            unique_ids = np.unique(val_ids)
+            n_samples_ids = len(unique_ids)
+            id_to_int = {sid: i for i, sid in enumerate(unique_ids)}
+            val_id_ints = np.array([id_to_int[sid] for sid in val_ids])
+            cmap_s = plt.get_cmap('nipy_spectral', n_samples_ids)
+            fig2, ax2 = plt.subplots(figsize=(10, 8))
+            for i, sid in enumerate(unique_ids):
+                mask = val_id_ints == i
+                ax2.scatter(val_emb[mask, 0], val_emb[mask, 1],
+                            s=1, alpha=0.4, color=cmap_s(i), label=str(sid), rasterized=True)
+            if n_samples_ids <= 30:
+                ax2.legend(markerscale=6, bbox_to_anchor=(1.02, 1),
+                           loc='upper left', fontsize=8, frameon=False, title='Sample ID')
+            ax2.set_xlabel('UMAP 1')
+            ax2.set_ylabel('UMAP 2')
+            ax2.set_title('Val features — UMAP (coloured by sample ID)')
+            plt.tight_layout()
+            plt.savefig(f'{work_dir}/umap_sample.png', dpi=150, bbox_inches='tight')
+            plt.close()
+            print(f"Saved sample UMAP to {work_dir}/umap_sample.png")
+
             np.savez_compressed(f'{work_dir}/umap_embeddings.npz',
                                 embedding=val_emb,
                                 labels_num=val_labels,
