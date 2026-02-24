@@ -1,0 +1,135 @@
+{
+  "classes": [
+    "B_Cell",
+    "Myeloid",
+    "Other",
+    "Progenitor",
+    "Stromal",
+    "T_Cell",
+    "Tumor"
+  ],
+  "n_classes": 7,
+  "feature_dim": 992,
+  "linear_probe": {
+    "train": {
+      "top1_accuracy": 0.8645341174567376,
+      "top2_accuracy": 0.9703669868821103,
+      "top1_balanced_accuracy": 0.8915527753908462,
+      "top2_balanced_accuracy": 0.973502741446721,
+      "precision": 0.8999533948344888,
+      "f1": 0.876142663687753,
+      "n_samples": 210171
+    },
+    "val": {
+      "top1_accuracy": 0.8556725068283259,
+      "top2_accuracy": 0.9663246952235027,
+      "top1_balanced_accuracy": 0.8310424151990867,
+      "top2_balanced_accuracy": 0.9431769858756095,
+      "precision": 0.8919452126996112,
+      "f1": 0.8682613823378817,
+      "n_samples": 30022
+    }
+  },
+  "knn": {
+    "k": 15,
+    "train": {
+      "top1_accuracy": 1.0,
+      "top1_balanced_accuracy": 1.0,
+      "f1": 1.0
+    },
+    "val": {
+      "top1_accuracy": 0.8841516221437612,
+      "top1_balanced_accuracy": 0.6776707133335039,
+      "f1": 0.8816532659321228
+    }
+  },
+  "clustering": {
+    "method": "MiniBatchKMeans(k=7, n_init=10)",
+    "val": {
+      "nmi": 0.27969494104471115,
+      "ari": 0.18987939900271927
+    },
+    "all": {
+      "nmi": 0.2762028834289713,
+      "ari": 0.18816513098653997
+    }
+  },
+  "neighbourhood_purity": {
+    "k": 15,
+    "mean_purity": 0.8216507894210912,
+    "mean_lift": 15.72779562555384,
+    "per_class": {
+      "B_Cell": {
+        "purity": 0.7881768504719324,
+        "expected_chance": 0.022350276463926455,
+        "purity_lift": 35.264747250176384,
+        "n_cells": 671
+      },
+      "Myeloid": {
+        "purity": 0.5527777777777778,
+        "expected_chance": 0.039171274398774235,
+        "purity_lift": 14.11181500377929,
+        "n_cells": 1176
+      },
+      "Other": {
+        "purity": 0.3176854115729421,
+        "expected_chance": 0.013623342881886616,
+        "purity_lift": 23.319196641180607,
+        "n_cells": 409
+      },
+      "Progenitor": {
+        "purity": 0.15846994535519127,
+        "expected_chance": 0.006095529944707215,
+        "purity_lift": 25.99773059810684,
+        "n_cells": 183
+      },
+      "Stromal": {
+        "purity": 0.7502384048547898,
+        "expected_chance": 0.12807274665245486,
+        "purity_lift": 5.85790829403134,
+        "n_cells": 3845
+      },
+      "T_Cell": {
+        "purity": 0.7453432709204387,
+        "expected_chance": 0.1832322963160349,
+        "purity_lift": 4.067750532552884,
+        "n_cells": 5501
+      },
+      "Tumor": {
+        "purity": 0.8962512109082269,
+        "expected_chance": 0.6074545333422157,
+        "purity_lift": 1.475421059049558,
+        "n_cells": 18237
+      }
+    }
+  },
+  "silhouette": {
+    "score": 0.06146617606282234,
+    "n_samples": 10000,
+    "metric": "cosine"
+  },
+  "umap": {
+    "saved": true,
+    "n_neighbors": 15,
+    "min_dist": 0.1,
+    "metric": "cosine"
+  },
+  "train": {
+    "top1_accuracy": 0.8645341174567376,
+    "top2_accuracy": 0.9703669868821103,
+    "top1_balanced_accuracy": 0.8915527753908462,
+    "top2_balanced_accuracy": 0.973502741446721,
+    "precision": 0.8999533948344888,
+    "f1": 0.876142663687753,
+    "n_samples": 210171
+  },
+  "val": {
+    "top1_accuracy": 0.8556725068283259,
+    "top2_accuracy": 0.9663246952235027,
+    "top1_balanced_accuracy": 0.8310424151990867,
+    "top2_balanced_accuracy": 0.9431769858756095,
+    "precision": 0.8919452126996112,
+    "f1": 0.8682613823378817,
+    "n_samples": 30022
+  }
+}

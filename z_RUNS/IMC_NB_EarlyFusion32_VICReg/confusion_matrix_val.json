@@ -1,0 +1,85 @@
+{
+  "classes": [
+    "B_Cell",
+    "Myeloid",
+    "Other",
+    "Progenitor",
+    "Stromal",
+    "T_Cell",
+    "Tumor"
+  ],
+  "matrix": {
+    "B_Cell": {
+      "B_Cell": 0.9136,
+      "Myeloid": 0.0253,
+      "Other": 0.0283,
+      "Progenitor": 0.0104,
+      "Stromal": 0.0089,
+      "T_Cell": 0.0134,
+      "Tumor": 0.0
+    },
+    "Myeloid": {
+      "B_Cell": 0.0179,
+      "Myeloid": 0.7696,
+      "Other": 0.0544,
+      "Progenitor": 0.0289,
+      "Stromal": 0.0587,
+      "T_Cell": 0.0255,
+      "Tumor": 0.0451
+    },
+    "Other": {
+      "B_Cell": 0.0416,
+      "Myeloid": 0.0465,
+      "Other": 0.8142,
+      "Progenitor": 0.0342,
+      "Stromal": 0.0391,
+      "T_Cell": 0.0147,
+      "Tumor": 0.0098
+    },
+    "Progenitor": {
+      "B_Cell": 0.0055,
+      "Myeloid": 0.0601,
+      "Other": 0.0601,
+      "Progenitor": 0.7541,
+      "Stromal": 0.0601,
+      "T_Cell": 0.0,
+      "Tumor": 0.0601
+    },
+    "Stromal": {
+      "B_Cell": 0.0135,
+      "Myeloid": 0.0492,
+      "Other": 0.0473,
+      "Progenitor": 0.0177,
+      "Stromal": 0.8278,
+      "T_Cell": 0.027,
+      "Tumor": 0.0174
+    },
+    "T_Cell": {
+      "B_Cell": 0.0129,
+      "Myeloid": 0.0127,
+      "Other": 0.0105,
+      "Progenitor": 0.0033,
+      "Stromal": 0.0282,
+      "T_Cell": 0.8778,
+      "Tumor": 0.0545
+    },
+    "Tumor": {
+      "B_Cell": 0.0004,
+      "Myeloid": 0.0133,
+      "Other": 0.027,
+      "Progenitor": 0.0209,
+      "Stromal": 0.0188,
+      "T_Cell": 0.0593,
+      "Tumor": 0.8602
+    }
+  },
+  "per_class_recall": {
+    "B_Cell": 0.9136,
+    "Myeloid": 0.7696,
+    "Other": 0.8142,
+    "Progenitor": 0.7541,
+    "Stromal": 0.8278,
+    "T_Cell": 0.8778,
+    "Tumor": 0.8602
+  }
+}
