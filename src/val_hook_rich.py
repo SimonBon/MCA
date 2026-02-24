@@ -198,16 +198,10 @@ class EvaluateModelRich(Hook):
         knn = KNeighborsClassifier(n_neighbors=self.knn_k, metric='cosine',
                                    weights='distance', n_jobs=self.n_jobs)
         knn.fit(train_feats, train_labels)
-        train_pred_knn = knn.predict(train_feats)
-        val_pred_knn   = knn.predict(val_feats)
+        val_pred_knn = knn.predict(val_feats)
 
         metrics['knn'] = {
             'k': self.knn_k,
-            'train': {
-                'top1_accuracy':          float(accuracy_score(train_labels, train_pred_knn)),
-                'top1_balanced_accuracy': float(balanced_accuracy_score(train_labels, train_pred_knn)),
-                'f1':                     float(f1_score(train_labels, train_pred_knn, average='weighted')),
-            },
             'val': {
                 'top1_accuracy':          float(accuracy_score(val_labels, val_pred_knn)),
                 'top1_balanced_accuracy': float(balanced_accuracy_score(val_labels, val_pred_knn)),
