@@ -421,6 +421,136 @@ class WideModelAttentionLateFusion(nn.Module):
         return (x,)
 
 
+@MODELS.register_module()
+class WideModelProgressiveFusion(nn.Module):
+    """
+    CIM backbone with a progressive cross-channel fusion stream.
+
+    Two parallel branches share the same spatial resolution at each stage:
+
+      CIM branch  — grouped convolutions keep every marker's features strictly
+                    independent throughout.  Provides multi-level per-marker
+                    feature maps that are *injected* into the fusion stream.
+
+      Fusion stream — standard (non-grouped) 1×1 convolutions freely mix
+                      marker information.  Receives an injection from the CIM
+                      branch after the stem and after each stage, accumulating
+                      richer cross-marker representations level by level.
+
+    After the last stage only the fusion stream is kept; the CIM branch is
+    discarded.  The final descriptor is therefore fully mixed, but it was
+    built by gradually integrating per-marker-specific features extracted at
+    multiple depths.
+
+    Args:
+        in_channels:   Number of input markers (C).
+        stem_width:    Per-marker expansion factor in the stem (D).
+                       Output feature dim = C * D (compatible with existing
+                       neck configs that use n_markers * features_per_marker).
+        block_width:   FFN expansion ratio inside each CIM ConvBlock.
+        layer_config:  Number of ConvBlocks per CIM stage.  One AvgPool2d(2)
+                       is appended after each stage.
+        drop_prob:     DropPath probability for CIM ConvBlocks.
+        input_norm:    If True, L2-normalise the input along the channel dim
+                       before the stem (removes absolute-intensity batch effects).
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        stem_width: int = 32,
+        block_width: int = 2,
+        layer_config=None,
+        drop_prob: float = 0.05,
+        input_norm: bool = False,
+    ):
+        super().__init__()
+
+        if layer_config is None:
+            layer_config = [2, 2]
+
+        self.in_channels = in_channels
+        self.stem_width = stem_width
+        self.cim_channels = in_channels * stem_width   # C * D
+        self.input_norm = input_norm
+
+        # ------------------------------------------------------------------ #
+        # CIM branch: depthwise grouped stem + per-stage ConvBlock sequences  #
+        # ------------------------------------------------------------------ #
+        self.stem = nn.Sequential(
+            nn.Conv2d(in_channels, self.cim_channels, kernel_size=3,
+                      padding=1, groups=in_channels, bias=False),
+            nn.BatchNorm2d(self.cim_channels),
+            nn.ReLU(inplace=True),
+        )
+
+        self.cim_stages = nn.ModuleList()
+        for n_blocks in layer_config:
+            self.cim_stages.append(nn.Sequential(*[
+                ConvBlock(self.cim_channels, groups=in_channels,
+                          block_width=block_width, drop_prob=drop_prob)
+                for _ in range(n_blocks)
+            ]))
+
+        self.pool = nn.AvgPool2d(kernel_size=2, stride=2)
+
+        # ------------------------------------------------------------------ #
+        # Injectors: project CIM features → fusion stream at each level.      #
+        # groups=in_channels keeps the projection per-marker (cheap).          #
+        # The fusion block is where cross-marker mixing actually happens.      #
+        # ------------------------------------------------------------------ #
+        n_inject = 1 + len(layer_config)
+        self.injectors = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(self.cim_channels, self.cim_channels,
+                          kernel_size=1, groups=in_channels, bias=False),
+                nn.BatchNorm2d(self.cim_channels),
+            )
+            for _ in range(n_inject)
+        ])
+
+        # ------------------------------------------------------------------ #
+        # Fusion stream: bottleneck 1×1 mixer per stage (groups=1).           #
+        # Reduces to cim_channels//4 internally to keep param count bounded.  #
+        # Residual connection for gradient flow.                               #
+        # ------------------------------------------------------------------ #
+        bottleneck = max(self.cim_channels // 4, 64)
+        self.fusion_blocks = nn.ModuleList([
+            nn.Sequential(
+                nn.BatchNorm2d(self.cim_channels),
+                nn.Conv2d(self.cim_channels, bottleneck, kernel_size=1, bias=False),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(bottleneck, self.cim_channels, kernel_size=1, bias=False),
+            )
+            for _ in range(len(layer_config))
+        ])
+
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+
+    def forward(self, x, *args, **kwargs):
+
+        if self.input_norm:
+            x = F.normalize(x, dim=1)
+
+        # CIM stem
+        cim = self.stem(x)                              # [B, C*D, H, W]
+
+        # Initialise fusion stream from stem-level CIM features
+        fusion = self.injectors[0](cim)                 # [B, C*D, H, W]
+
+        for cim_stage, fusion_block, injector in zip(
+            self.cim_stages, self.fusion_blocks, self.injectors[1:]
+        ):
+            cim    = cim_stage(cim)                     # grouped: per-marker
+            fusion = fusion + injector(cim)             # inject CIM → fusion
+            fusion = fusion + fusion_block(fusion)      # residual 1×1 mixer
+            cim    = self.pool(cim)
+            fusion = self.pool(fusion)
+
+        fusion = self.avgpool(fusion)                   # [B, C*D, 1, 1]
+        return (fusion,)
+
+
 class ConvBlock(nn.Module):
     """
     Depthwise-separable ConvNeXt-style block with an FFN and skip connection.
