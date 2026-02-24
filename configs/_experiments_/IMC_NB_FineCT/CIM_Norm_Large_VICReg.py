@@ -1,0 +1,66 @@
+from copy import deepcopy
+
+_base_ = [
+    '../../_base_/default.py',
+    '../../_augmentations_/medium.py',
+    '../../_base_/train_cfg.py',
+    '../../_base_/val_cfg.py',
+    '../../_datasets_/IMC_NB_FineCT.py',
+    '../../_backbones_/CIM_Norm_Large.py',
+    '../../_algorithms_/VICReg.py',
+]
+
+batch_size = 256
+num_workers = 16
+mask_patch = True
+
+n_linear = 400
+n_cosine = 1600
+
+param_scheduler = [
+    dict(type='LinearLR', start_factor=1e-4, by_epoch=False, begin=0, end=n_linear),
+    dict(type='CosineAnnealingLR', T_max=n_cosine, eta_min=1e-6,
+         by_epoch=False, begin=n_linear, end=n_linear + n_cosine),
+]
+
+train_cfg = dict(type='IterBasedTrainLoop', max_iters=n_linear + n_cosine)
+
+_base_.val_augmentation[0].size = _base_.cutter_size
+_base_.val_pipeline[0].transforms = [_base_.val_augmentation]
+
+_base_.train_aug_mid[-2].size = _base_.cutter_size
+_base_.train_pipeline[0].transforms = [_base_.train_aug_mid, _base_.train_aug_mid]
+
+train_dataset = deepcopy(_base_.dataset)
+train_dataset['used_indicies'] = _base_.train_indicies
+train_dataset['pipeline'] = _base_.train_pipeline
+train_dataset['mask_patch'] = mask_patch
+
+train_dataloader = dict(
+    batch_size=batch_size,
+    num_workers=num_workers,
+    sampler=dict(type='InfiniteSampler', shuffle=True),
+    collate_fn=dict(type='default_collate'),
+    drop_last=True,
+    dataset=train_dataset,
+)
+
+dataset_kwargs = dict(
+    h5_filepath=_base_.h5_filepath,
+    used_markers=_base_.used_markers,
+    patch_size=_base_.patch_size,
+    ignore_annotation=_base_.ignore_annotation,
+)
+
+_base_.custom_hooks[0].type = 'EvaluateModelRich'
+_base_.custom_hooks[0].n_jobs = 8
+_base_.custom_hooks[0].train_indicies = _base_.train_indicies
+_base_.custom_hooks[0].val_indicies = _base_.val_indicies
+_base_.custom_hooks[0].pipeline = _base_.val_pipeline
+_base_.custom_hooks[0].dataset_kwargs = dataset_kwargs
+
+_base_.model.backbone = _base_.backbone
+_base_.model.backbone.in_channels = _base_.n_markers
+_base_.model.neck.in_channels = _base_.n_markers * _base_.features_per_marker
+
+work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/IMC_NB_FineCT_CIM_Norm_Large_VICReg'
