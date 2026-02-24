@@ -1,0 +1,158 @@
+{
+  "classes": [
+    "B_Cell",
+    "CD4_T",
+    "CD8_T",
+    "Myeloid",
+    "NK_DC",
+    "Neutrophil",
+    "Progenitor",
+    "Proliferating",
+    "Stromal",
+    "T_Cell",
+    "Tumor"
+  ],
+  "n_classes": 11,
+  "feature_dim": 992,
+  "linear_probe": {
+    "train": {
+      "top1_accuracy": 0.7944516265966889,
+      "top2_accuracy": 0.9521765137189827,
+      "top1_balanced_accuracy": 0.8888404600031226,
+      "top2_balanced_accuracy": 0.9721839417465145,
+      "precision": 0.8376379613651767,
+      "f1": 0.8058351921122795,
+      "n_samples": 207304
+    },
+    "val": {
+      "top1_accuracy": 0.7838714034850737,
+      "top2_accuracy": 0.9466432527353775,
+      "top1_balanced_accuracy": 0.8033732001434746,
+      "top2_balanced_accuracy": 0.9192894350324963,
+      "precision": 0.827483456464694,
+      "f1": 0.7965240163443035,
+      "n_samples": 29612
+    }
+  },
+  "knn": {
+    "k": 15,
+    "val": {
+      "top1_accuracy": 0.7942050520059435,
+      "top1_balanced_accuracy": 0.5021092830556724,
+      "f1": 0.7832899694306642
+    }
+  },
+  "clustering": {
+    "method": "MiniBatchKMeans(k=11, n_init=10)",
+    "val": {
+      "nmi": 0.21216462289616211,
+      "ari": 0.09372201119096178
+    },
+    "all": {
+      "nmi": 0.20966274775337004,
+      "ari": 0.09220936974851046
+    }
+  },
+  "neighbourhood_purity": {
+    "k": 15,
+    "mean_purity": 0.668242604349588,
+    "mean_lift": 16.154199181899795,
+    "per_class": {
+      "B_Cell": {
+        "purity": 0.6644808743169399,
+        "expected_chance": 0.022659732540861812,
+        "purity_lift": 29.32430350264266,
+        "n_cells": 671
+      },
+      "CD4_T": {
+        "purity": 0.122040072859745,
+        "expected_chance": 0.006179927056598676,
+        "purity_lift": 19.74781769138125,
+        "n_cells": 183
+      },
+      "CD8_T": {
+        "purity": 0.28377065111758987,
+        "expected_chance": 0.011583141969471836,
+        "purity_lift": 24.498590439924406,
+        "n_cells": 343
+      },
+      "Myeloid": {
+        "purity": 0.31884432945235014,
+        "expected_chance": 0.026104282047818454,
+        "purity_lift": 12.214253924635177,
+        "n_cells": 773
+      },
+      "NK_DC": {
+        "purity": 0.012121212121212121,
+        "expected_chance": 0.0003714710252600297,
+        "purity_lift": 32.63030303030303,
+        "n_cells": 11
+      },
+      "Neutrophil": {
+        "purity": 0.43358908780903666,
+        "expected_chance": 0.013204106443333783,
+        "purity_lift": 32.83744262967057,
+        "n_cells": 391
+      },
+      "Progenitor": {
+        "purity": 0.07759562841530054,
+        "expected_chance": 0.006179927056598676,
+        "purity_lift": 12.556075129146883,
+        "n_cells": 183
+      },
+      "Proliferating": {
+        "purity": 0.4402428810720268,
+        "expected_chance": 0.10752397676617588,
+        "purity_lift": 4.094369407759063,
+        "n_cells": 3184
+      },
+      "Stromal": {
+        "purity": 0.630307758994365,
+        "expected_chance": 0.1298460083749831,
+        "purity_lift": 4.854271354835146,
+        "n_cells": 3845
+      },
+      "T_Cell": {
+        "purity": 0.5625862646566164,
+        "expected_chance": 0.1680062136971498,
+        "purity_lift": 3.348603913369191,
+        "n_cells": 4975
+      },
+      "Tumor": {
+        "purity": 0.8083438517239089,
+        "expected_chance": 0.508341213021748,
+        "purity_lift": 1.5901599772303454,
+        "n_cells": 15053
+      }
+    }
+  },
+  "silhouette": {
+    "score": -0.02119346708059311,
+    "n_samples": 10000,
+    "metric": "cosine"
+  },
+  "umap": {
+    "saved": true,
+    "n_neighbors": 15,
+    "min_dist": 0.1,
+    "metric": "cosine"
+  },
+  "train": {
+    "top1_accuracy": 0.7944516265966889,
+    "top2_accuracy": 0.9521765137189827,
+    "top1_balanced_accuracy": 0.8888404600031226,
+    "top2_balanced_accuracy": 0.9721839417465145,
+    "precision": 0.8376379613651767,
+    "f1": 0.8058351921122795,
+    "n_samples": 207304
+  },
+  "val": {
+    "top1_accuracy": 0.7838714034850737,
+    "top2_accuracy": 0.9466432527353775,
+    "top1_balanced_accuracy": 0.8033732001434746,
+    "top2_balanced_accuracy": 0.9192894350324963,
+    "precision": 0.827483456464694,
+    "f1": 0.7965240163443035,
+    "n_samples": 29612
+  }
+}
