@@ -192,6 +192,7 @@ class WideModelAttention(nn.Module):
         layer_config: Optional[List[int]] = None,
         drop_prob: float = 0.05,
         n_heads: int = 4,
+        input_norm: bool = False,
     ):
         super().__init__()
 
@@ -205,6 +206,7 @@ class WideModelAttention(nn.Module):
         self.in_channels = in_channels
         self.stem_width = stem_width
         self.stem_out_channels = in_channels * stem_width  # C * D
+        self.input_norm = input_norm
 
         # Depthwise stem: each input channel independently expanded to stem_width channels.
         self.stem = nn.Sequential(
@@ -260,6 +262,9 @@ class WideModelAttention(nn.Module):
         Returns:
             Tuple containing a single tensor of shape [B, in_channels * stem_width, 1, 1].
         """
+        if self.input_norm:
+            x = F.normalize(x, dim=1)
+
         x = self.stem(x)       # [B, C*D, H, W]
         x = self.layers(x)     # [B, C*D, H', W']
 
