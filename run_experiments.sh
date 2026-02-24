@@ -54,13 +54,13 @@ echo "============================================================"
 
 # ── CIM variants ──────────────────────────────────────────────────────────────
 run $CONFIGS/CIM_VICReg.py
+run $CONFIGS/CIM_Norm_VICReg.py         # CIM with input L2-norm
+run $CONFIGS/CIM_ProgFusion_VICReg.py   # CIM with progressive cross-marker fusion
 
 # ── ResNet baseline ───────────────────────────────────────────────────────────
 run $CONFIGS/ResNet_VICReg.py
 
-# ── EarlyFusion variants (smallest → largest) ─────────────────────────────────
-run $CONFIGS/EarlyFusion_VICReg.py      # stem_width=5  (param-matched)
-run $CONFIGS/EarlyFusion16_VICReg.py    # stem_width=16
+# ── EarlyFusion baseline ──────────────────────────────────────────────────────
 run $CONFIGS/EarlyFusion32_VICReg.py    # stem_width=32 (same width as CIM)
 
 echo ""
