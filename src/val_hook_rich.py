@@ -362,7 +362,7 @@ class EvaluateModelRich(Hook):
             f'{work_dir}/train_results.npz',
             features=train_feats, labels_str=train_labels_str,
             labels_num=train_labels, sample_ids=train_ids,
-            top1_pred_lr=train_pred_lr, top1_pred_knn=train_pred_knn,
+            top1_pred_lr=train_pred_lr,
             classes=le.classes_,
         )
 
