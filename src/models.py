@@ -6,7 +6,7 @@ from mmengine.registry import MODELS
 @MODELS.register_module()
 class WideModel(nn.Module):
     
-    def __init__(self, in_channels, stem_width=16, block_width=4, layer_config=[2, 2], drop_prob=0.05, late_fusion=False, input_norm=False):
+    def __init__(self, in_channels, stem_width=16, block_width=4, layer_config=[2, 2], drop_prob=0.05, late_fusion=False, input_norm=False, instance_norm=False):
         super().__init__()
 
         self.in_channels = in_channels
@@ -16,6 +16,7 @@ class WideModel(nn.Module):
         self.layer_config = layer_config
         self.drop_prob=drop_prob
         self.input_norm = input_norm
+        self.inst_norm = nn.InstanceNorm2d(in_channels, affine=False) if instance_norm else None
         
         self.stem = nn.Sequential(
             nn.Conv2d(
@@ -62,6 +63,9 @@ class WideModel(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x, *args, **kwargs):
+
+        if self.inst_norm is not None:
+            x = self.inst_norm(x)
 
         if self.input_norm:
             x = F.normalize(x, dim=1)
@@ -463,6 +467,7 @@ class WideModelProgressiveFusion(nn.Module):
         layer_config=None,
         drop_prob: float = 0.05,
         input_norm: bool = False,
+        instance_norm: bool = False,
     ):
         super().__init__()
 
@@ -473,6 +478,7 @@ class WideModelProgressiveFusion(nn.Module):
         self.stem_width = stem_width
         self.cim_channels = in_channels * stem_width   # C * D
         self.input_norm = input_norm
+        self.inst_norm = nn.InstanceNorm2d(in_channels, affine=False) if instance_norm else None
 
         # ------------------------------------------------------------------ #
         # CIM branch: depthwise grouped stem + per-stage ConvBlock sequences  #
@@ -528,6 +534,9 @@ class WideModelProgressiveFusion(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, x, *args, **kwargs):
+
+        if self.inst_norm is not None:
+            x = self.inst_norm(x)
 
         if self.input_norm:
             x = F.normalize(x, dim=1)
