@@ -6,12 +6,12 @@ _base_ = [
     '../../_base_/train_cfg.py',
     '../../_base_/val_cfg.py',
     '../../_datasets_/CODEX_DLBCL.py',
-    '../../_backbones_/ResNet.py',
+    '../../_backbones_/CIM_ProgFusion.py',
     '../../_algorithms_/VICReg.py',
 ]
 
 batch_size = 256
-num_workers = 16
+num_workers = 8
 mask_patch = True
 
 _base_.val_augmentation[0].size = _base_.cutter_size
@@ -46,7 +46,6 @@ _base_.custom_hooks[0].dataset_kwargs = _base_.dataset_kwargs
 
 _base_.model.backbone = _base_.backbone
 _base_.model.backbone.in_channels = _base_.n_markers
-# ResNetBaseline output is base_width * 4 = 64 * 4 = 256, independent of n_markers
-_base_.model.neck.in_channels = 256
+_base_.model.neck.in_channels = _base_.n_markers * _base_.features_per_marker
 
-work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/CODEX_DLBCL_ResNet_VICReg'
+work_dir = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/z_RUNS/CODEX_DLBCL_CIM_ProgFusion_VICReg'

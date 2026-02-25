@@ -5,7 +5,7 @@ _base_ = [
     '../../_augmentations_/high.py',
     '../../_base_/train_cfg.py',
     '../../_base_/val_cfg.py',
-    '../../_datasets_/CODEX_DLCBL.py',
+    '../../_datasets_/CODEX_DLBCL.py',
     '../../_backbones_/CIM.py',
     '../../_algorithms_/VICReg.py',
 ]
@@ -22,6 +22,8 @@ _base_.train_aug_weak[-2].size = _base_.cutter_size
 _base_.train_pipeline[0].transforms = [_base_.train_aug_strong, _base_.train_aug_weak]
 
 train_dataset = deepcopy(_base_.dataset)
+train_dataset.update(_base_.dataset_kwargs)
+
 train_dataset['used_indicies'] = _base_.train_indicies
 train_dataset['pipeline'] = _base_.train_pipeline
 train_dataset['mask_patch'] = mask_patch
@@ -35,19 +37,12 @@ train_dataloader = dict(
     dataset=train_dataset,
 )
 
-dataset_kwargs = dict(
-    h5_filepath=_base_.h5_filepath,
-    used_markers=_base_.used_markers,
-    patch_size=_base_.patch_size,
-    ignore_annotation=_base_.ignore_annotation,
-)
-
 _base_.custom_hooks[0].type = 'EvaluateModelRich'
 _base_.custom_hooks[0].n_jobs = 8
 _base_.custom_hooks[0].train_indicies = _base_.train_indicies
 _base_.custom_hooks[0].val_indicies = _base_.val_indicies
 _base_.custom_hooks[0].pipeline = _base_.val_pipeline
-_base_.custom_hooks[0].dataset_kwargs = dataset_kwargs
+_base_.custom_hooks[0].dataset_kwargs = _base_.dataset_kwargs
 
 _base_.model.backbone = _base_.backbone
 _base_.model.backbone.in_channels = _base_.n_markers

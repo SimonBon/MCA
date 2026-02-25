@@ -6,7 +6,7 @@ _base_ = [
     '../../_base_/train_cfg.py',
     '../../_base_/val_cfg.py',
     '../../_datasets_/CODEX_cHL_AllMarkers.py',
-    '../../_backbones_/EarlyFusion32.py',
+    '../../_backbones_/EarlyFusion_32.py',
     '../../_algorithms_/VICReg.py',
 ]
 

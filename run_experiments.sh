@@ -10,7 +10,7 @@
 #   bash run_experiments.sh IMC_NB 2
 #   bash run_experiments.sh MIBI_TNBC 3
 #
-# Available datasets: CODEX_cHL  CODEX_cHL_AllMarkers  CODEX_DLBCL  IMC_NB  MIBI_TNBC
+# Available datasets: CODEX_cHL  CODEX_cHL_AllMarkers  CODEX_DLBCL  IMC_NB  IMC_NB_FineCT  MIBI_TNBC
 
 set -e
 
