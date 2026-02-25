@@ -10,7 +10,7 @@
 #   bash run_experiments.sh IMC_NB 2
 #   bash run_experiments.sh MIBI_TNBC 3
 #
-# Available datasets: CODEX_cHL  CODEX_DLBCL  IMC_NB  MIBI_TNBC
+# Available datasets: CODEX_cHL  CODEX_cHL_AllMarkers  CODEX_DLBCL  IMC_NB  MIBI_TNBC
 
 set -e
 
@@ -20,7 +20,7 @@ GPU=${2:-0}
 if [ -z "$DATASET" ]; then
     echo "ERROR: no dataset specified."
     echo "Usage: bash run_experiments.sh <dataset> [gpu]"
-    echo "Available datasets: CODEX_cHL  CODEX_DLBCL  IMC_NB  MIBI_TNBC"
+    echo "Available datasets: CODEX_cHL  CODEX_cHL_AllMarkers  CODEX_DLBCL  IMC_NB  MIBI_TNBC"
     exit 1
 fi
 
