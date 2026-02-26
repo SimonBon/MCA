@@ -8,8 +8,8 @@
 #   bash run_cv.sh 0
 #   bash run_cv.sh 2 MIBI_TNBC_CV
 #
-# This runs CIM_Norm, CIM_ProgFusion, EarlyFusion32, ResNet
-# on each of split_0 through split_4, sequentially.
+# This runs all splits for one model before moving to the next:
+# CIM → CIM_Norm → CIM_ProgFusion → EarlyFusion32 → ResNet, each across splits 0-4.
 
 set -e
 
@@ -40,17 +40,15 @@ echo "  GPU       : $GPU"
 echo "  Started   : $(date '+%Y-%m-%d %H:%M:%S')"
 echo "============================================================"
 
-for k in $(seq 0 $((N_SPLITS-1))); do
-    CONFIGS=$CONFIG_BASE/${PREFIX}${k}
+for model in CIM_VICReg CIM_Norm_VICReg CIM_ProgFusion_VICReg EarlyFusion32_VICReg ResNet_VICReg; do
     echo ""
     echo "────────────────────────────────────────────────────────────"
-    echo "  Split $k"
+    echo "  Model: $model"
     echo "────────────────────────────────────────────────────────────"
 
-    run $CONFIGS/CIM_Norm_VICReg.py
-    run $CONFIGS/CIM_ProgFusion_VICReg.py
-    run $CONFIGS/EarlyFusion32_VICReg.py
-    run $CONFIGS/ResNet_VICReg.py
+    for k in $(seq 0 $((N_SPLITS-1))); do
+        run $CONFIG_BASE/${PREFIX}${k}/${model}.py
+    done
 done
 
 echo ""
