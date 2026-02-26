@@ -431,6 +431,140 @@ class WideModelAttentionLateFusion(nn.Module):
 
 
 @MODELS.register_module()
+class WideModelAttentionGated(nn.Module):
+    """
+    WideModelAttention with marker gating before cross-marker self-attention.
+
+    Before attention, each marker's token is scaled by a learned gate derived
+    from that marker's *relative* expression (token_i - mean_of_all_tokens).
+    Because relative expression is preserved across samples — even when global
+    per-sample intensity shifts — the gates route attention toward markers that
+    are distinctively expressed for the current cell type, suppressing noisy or
+    non-specific markers that dominate absolute-intensity embeddings.
+
+    Gate computation (applied after spatial mean-pool, before attention):
+        rel   = tokens - tokens.mean(dim=1, keepdim=True)        [B, C, D]
+        gates = softmax(gate_proj(rel).squeeze(-1) / T, dim=1)   [B, C]
+        tokens = tokens * gates.unsqueeze(-1)                     [B, C, D]
+    where T is a learned scalar temperature (initialised to 1.0).
+
+    Args:
+        in_channels:  Number of input channels (markers).
+        stem_width:   Expansion factor per marker in the stem (D).
+        block_width:  FFN expansion ratio inside each ConvBlock.
+        layer_config: Number of ConvBlocks per stage.
+        drop_prob:    Dropout probability.
+        n_heads:      Attention heads (must divide stem_width).
+        input_norm:   If True, L2-normalise input along channel dim.
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        stem_width: int = 16,
+        block_width: int = 4,
+        layer_config: Optional[List[int]] = None,
+        drop_prob: float = 0.05,
+        n_heads: int = 4,
+        input_norm: bool = False,
+    ):
+        super().__init__()
+
+        if layer_config is None:
+            layer_config = [2, 2]
+
+        assert stem_width % n_heads == 0, (
+            f"stem_width ({stem_width}) must be divisible by n_heads ({n_heads})"
+        )
+
+        self.in_channels = in_channels
+        self.stem_width = stem_width
+        self.stem_out_channels = in_channels * stem_width
+        self.input_norm = input_norm
+
+        self.stem = nn.Sequential(
+            nn.Conv2d(
+                in_channels,
+                self.stem_out_channels,
+                kernel_size=3,
+                padding=1,
+                groups=in_channels,
+                bias=False,
+            ),
+            nn.BatchNorm2d(self.stem_out_channels),
+            nn.ReLU(inplace=True),
+        )
+
+        layers = []
+        for n_blocks in layer_config:
+            for _ in range(n_blocks):
+                layers.append(
+                    ConvBlock(
+                        in_channels=self.stem_out_channels,
+                        groups=in_channels,
+                        block_width=block_width,
+                        drop_prob=drop_prob,
+                    )
+                )
+            layers.append(nn.AvgPool2d(kernel_size=2, stride=2))
+        self.layers = nn.Sequential(*layers)
+
+        # Marker gating: project relative token [D] -> scalar gate, then softmax.
+        self.gate_proj = nn.Linear(stem_width, 1, bias=False)
+        self.gate_temp = nn.Parameter(torch.ones(1))  # learned temperature
+
+        self.channel_attn = nn.MultiheadAttention(
+            embed_dim=stem_width,
+            num_heads=n_heads,
+            dropout=drop_prob,
+        )
+        self.attn_norm = nn.LayerNorm(stem_width)
+        self.ffn_norm = nn.LayerNorm(stem_width)
+        self.ffn = nn.Sequential(
+            nn.Linear(stem_width, stem_width * 4),
+            nn.GELU(),
+            nn.Linear(stem_width * 4, stem_width),
+        )
+
+    def forward(self, x: torch.Tensor, *args, **kwargs):
+        if self.input_norm:
+            x = F.normalize(x, dim=1)
+
+        x = self.stem(x)    # [B, C*D, H, W]
+        x = self.layers(x)  # [B, C*D, H', W']
+
+        B, CD, H, W = x.shape
+        C = self.in_channels
+        D = self.stem_width
+
+        # Per-channel tokens via spatial mean pool.
+        tokens = x.view(B, C, D, H, W).mean(dim=(-2, -1))   # [B, C, D]
+
+        # Marker gating from relative expression (sample-invariant).
+        rel = tokens - tokens.mean(dim=1, keepdim=True)                      # [B, C, D]
+        gates = torch.softmax(
+            self.gate_proj(rel).squeeze(-1) / self.gate_temp.abs().clamp(min=1e-4),  # [B, C]
+            dim=1,
+        )
+        tokens = tokens * gates.unsqueeze(-1)                                # [B, C, D]
+
+        # Cross-marker self-attention (pre-norm, residual).
+        tokens_t = self.attn_norm(tokens).transpose(0, 1)    # [C, B, D]
+        attn_out, _ = self.channel_attn(tokens_t, tokens_t, tokens_t)
+        tokens = tokens + attn_out.transpose(0, 1)            # [B, C, D]
+
+        # FFN with pre-norm and residual.
+        tokens = tokens + self.ffn(self.ffn_norm(tokens))     # [B, C, D]
+
+        # Additive correction broadcast over spatial dims.
+        correction = tokens.view(B, CD, 1, 1)
+        x = x + correction                                    # [B, C*D, H', W']
+
+        out = x.mean(dim=(-2, -1)).view(B, CD, 1, 1)         # global avg pool
+        return (out,)
+
+
+@MODELS.register_module()
 class WideModelProgressiveFusion(nn.Module):
     """
     CIM backbone with a progressive cross-channel fusion stream.
