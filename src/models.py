@@ -511,7 +511,7 @@ class WideModelAttentionGated(nn.Module):
 
         # Marker gating: project relative token [D] -> scalar gate, then softmax.
         self.gate_proj = nn.Linear(stem_width, 1, bias=False)
-        self.gate_temp = nn.Parameter(torch.ones(1))  # learned temperature
+        self.gate_temp = nn.Parameter(torch.full((1,), 5.0))  # learned temperature (high init → near-uniform start)
 
         self.channel_attn = nn.MultiheadAttention(
             embed_dim=stem_width,
@@ -542,9 +542,8 @@ class WideModelAttentionGated(nn.Module):
 
         # Marker gating from relative expression (sample-invariant).
         rel = tokens - tokens.mean(dim=1, keepdim=True)                      # [B, C, D]
-        gates = torch.softmax(
-            self.gate_proj(rel).squeeze(-1) / self.gate_temp.abs().clamp(min=1e-4),  # [B, C]
-            dim=1,
+        gates = torch.sigmoid(
+            self.gate_proj(rel).squeeze(-1) / self.gate_temp.abs().clamp(min=1e-4)   # [B, C]
         )
         tokens = tokens * gates.unsqueeze(-1)                                # [B, C, D]
 
