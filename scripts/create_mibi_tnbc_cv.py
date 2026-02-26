@@ -32,7 +32,6 @@ def main():
 
     output = Path(args.output)
 
-    # Read sample IDs for all cells (no filtering — dataset handles ignore_annotation)
     print(f'Reading {args.h5} ...')
     with h5py.File(args.h5, 'r') as f:
         sample_ids = f['coords']['sample_id'][:].astype(str)
