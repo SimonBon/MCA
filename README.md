@@ -452,22 +452,80 @@ The CIM backbone (trained on single cells) generalises to tissue region discover
 1. Extract overlapping spatial patches (ps64: 64×64px, 50% stride; ps128: 128×128px, 50% stride) from full tissue images
 2. Embed each patch with the frozen CIM backbone
 3. PCA (64 components) → MiniBatchKMeans (k ∈ {2, 4, 8, 12, 16})
-4. Interpret clusters by the cell-type composition within each patch
+4. Interpret clusters by the cell-type composition of cells whose centre falls within each patch
 
-**Results on CODEX_cHL (k=8, ps64):**
+All results stored at `z_RUNS/region_analysis/ps{PATCH_SIZE}/k_{k}/`.
+
+---
+
+### k=2 — Fundamental tissue dichotomy
+
+| | ps64 | ps128 |
+|---|---|---|
+| UMAP | ![](z_RUNS/region_analysis/ps64/k_2/umap.png) | ![](z_RUNS/region_analysis/ps128/k_2/umap.png) |
+| Spatial map | ![](z_RUNS/region_analysis/ps64/k_2/spatial_map.png) | ![](z_RUNS/region_analysis/ps128/k_2/spatial_map.png) |
+
+The first split separates the two fundamental tissue compartments in cHL:
 
 | Cluster | Top cell types | Interpretation |
 |---------|---------------|----------------|
-| Dense tumour | Tumor 41–49%, DC 11%, NK 9% | Reed-Sternberg cell niche |
-| Tumour-immune border | Tumor 17–20%, NK 17%, DC 13% | Tumour-infiltrating immune zone |
-| B follicle | B 35%, CD4 26% | B cell follicle with follicular helper T cells |
-| CD4 T zone | CD4 38%, CD8 17–19% | T cell-rich interfollicular area |
-| NK/Monocyte | CD4 30%, NK 11%, Monocyte 10% | Innate immune-enriched area |
-| Stromal/M2 | Other 21–23%, M2 14%, CD4 20% | Stromal + M2 macrophage regions |
+| C0 | Tumor ~17%, NK ~11%, DC ~9% | **Tumour niche** — Reed-Sternberg cell-enriched regions with innate immune infiltration |
+| C1 | CD4 ~30%, CD8 ~15%, B ~14% | **Lymphoid zone** — mixed adaptive immune areas |
 
-Results stored at `z_RUNS/region_analysis/ps{PATCH_SIZE}/k_{k}/umap.png`.
+This dichotomy is consistent across both patch sizes, confirming it reflects genuine tissue-level structure.
 
-**Key finding:** The tumour/lymphoid dichotomy is recovered robustly at k=2 and persists across all k values and both patch sizes. B-cell follicle structure (B + CD4/TFH) appears from k≥4. At k=8, distinct innate immune, vascular, and stromal compartments are discriminated. The CIM features trained on single cells transfer to patch-level tissue organisation.
+---
+
+### k=4 — Stromal and vascular compartments emerge
+
+| | ps64 | ps128 |
+|---|---|---|
+| Composition | ![](z_RUNS/region_analysis/ps64/k_4/composition.png) | ![](z_RUNS/region_analysis/ps128/k_4/composition.png) |
+| Spatial map | ![](z_RUNS/region_analysis/ps64/k_4/spatial_map.png) | ![](z_RUNS/region_analysis/ps128/k_4/spatial_map.png) |
+
+---
+
+### k=8 — Most informative granularity (ps64)
+
+Verified directly from `z_RUNS/region_analysis/ps64/k_8/results.json`:
+
+| Cluster | Size | Top cell types | Interpretation |
+|---------|------|---------------|----------------|
+| C5 | 5,712 | Tumor **48.5%**, DC 10.5%, NK 8.6%, Monocyte 6.1% | **Dense tumour niche** — highest RS cell concentration |
+| C6 | 6,138 | Tumor **20.3%**, NK 17.2%, Monocyte 13.0%, DC 13.2% | **Tumour-infiltrating immune zone** — tumour border with innate immune infiltrate |
+| C4 | 7,750 | NK **11.4%**, Monocyte 10.4%, DC 9.1%, Tumor 6.8%, CD4 26.2% | **Innate immune / tumour-adjacent** — mixed NK/Monocyte/DC zone near tumour |
+| C2 | 15,046 | B **23.4%**, CD4 29.1%, CD8 14.2% | **B cell follicle** — B cells with follicular helper T cells (TFH) |
+| C1 | 8,375 | CD4 **38.0%**, CD8 19.0%, TReg 4.1%, B 7.4% | **T cell zone** — interfollicular CD4-rich area with Tregs |
+| C3 | 7,565 | M2 **13.8%**, CD4 22.6%, Other 9.0%, Mast 4.4% | **Stromal / M2 macrophage** — connective tissue with anti-inflammatory macrophages |
+| C7 | 6,734 | Other **22.2%**, M2 14.2%, CD4 18.0%, Endothelial 7.9% | **Dense stroma** — stromal cells + M2 macrophages |
+| C0 | 5,179 | Endothelial **23.7%**, CD4 18.1%, CD8 12.0%, M2 7.8% | **Vascular / perivascular** — endothelial-enriched zone |
+
+| UMAP (k=8) | Spatial map | Composition |
+|---|---|---|
+| ![](z_RUNS/region_analysis/ps64/k_8/umap.png) | ![](z_RUNS/region_analysis/ps64/k_8/spatial_map.png) | ![](z_RUNS/region_analysis/ps64/k_8/composition.png) |
+
+| Spatial map with pies (ps64, k=8) |
+|---|
+| ![](z_RUNS/region_analysis/ps64/k_8/spatial_map_with_pie.png) |
+
+---
+
+### k=12 and k=16 — Further sub-compartment resolution
+
+| k=12 spatial (ps64) | k=16 spatial (ps64) |
+|---|---|
+| ![](z_RUNS/region_analysis/ps64/k_12/spatial_map.png) | ![](z_RUNS/region_analysis/ps64/k_16/spatial_map.png) |
+
+At k≥12 the tumour niche begins to split into sub-regions (e.g. dense core vs infiltrating rim), and the T-cell zone separates into CD4-dominant and CD8-enriched sub-areas.
+
+---
+
+**Key biological findings:**
+- **Tumour niche is robustly recovered at all k.** A Tumor-enriched cluster (rising to 48.5% at k=8) is present at every granularity, co-localising with DC and NK — consistent with the characteristic RS cell microenvironment in cHL.
+- **B cell follicle structure is preserved.** A B-cell-rich cluster (B=23.4%) appears from k≥4, always co-localising with CD4 T cells (follicular helper T cells). This mirrors germinal centre residuals common in cHL.
+- **Vascular and stromal compartments are separated.** At k=8, an Endothelial-enriched cluster (23.7%) is cleanly distinguished from stromal/M2 clusters — a granularity not visible at k≤4.
+- **ps64 vs ps128 give consistent structures.** Both patch sizes recover the same biological compartments; larger patches smooth boundaries but don't change interpretation.
+- **CIM features trained on single cells transfer to tissue-level organisation** without any spatial supervision or retraining.
 
 ---
 
