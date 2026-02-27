@@ -230,8 +230,8 @@ All metrics are computed on frozen features (no fine-tuning) at each validation 
 
 17 cell types, 41 markers, ~115k cells. Results at `z_RUNS/CODEX_cHL_<MODEL>_VICReg/`.
 
-![UMAP — CIM](z_RUNS/CODEX_cHL_CIM_VICReg/umap.png)
-*UMAP of CIM embeddings, CODEX_cHL (coloured by cell type)*
+![UMAP — CIM + VICReg, CODEX_cHL, coloured by cell type](z_RUNS/CODEX_cHL_CIM_VICReg/umap.png)
+*UMAP — **CIM + VICReg**, CODEX_cHL · coloured by cell type · `z_RUNS/CODEX_cHL_CIM_VICReg/umap.png`*
 
 | Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
 |-------|------------|-------------|-----|-----|-----------|--------------|
@@ -254,8 +254,8 @@ All metrics are computed on frozen features (no fine-tuning) at each validation 
 
 18 cell types, 40 markers, ~416k cells. Results at `z_RUNS/CODEX_DLBCL_<MODEL>_VICReg/`.
 
-![UMAP — CIM](z_RUNS/CODEX_DLBCL_CIM_VICReg/umap.png)
-*UMAP of CIM embeddings, CODEX_DLBCL*
+![UMAP — CIM + VICReg, CODEX_DLBCL, coloured by cell type](z_RUNS/CODEX_DLBCL_CIM_VICReg/umap.png)
+*UMAP — **CIM + VICReg**, CODEX_DLBCL · coloured by cell type · `z_RUNS/CODEX_DLBCL_CIM_VICReg/umap.png`*
 
 | Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
 |-------|------------|-------------|-----|-----|-----------|--------------|
@@ -277,8 +277,8 @@ All metrics are computed on frozen features (no fine-tuning) at each validation 
 
 7 coarse cell types, 31 markers, ~240k cells. Results at `z_RUNS/IMC_NB_<MODEL>_VICReg/`.
 
-![UMAP — CIM](z_RUNS/IMC_NB_CIM_VICReg/umap.png)
-*UMAP of CIM embeddings, IMC_NB*
+![UMAP — CIM + VICReg, IMC_NB, coloured by cell type](z_RUNS/IMC_NB_CIM_VICReg/umap.png)
+*UMAP — **CIM + VICReg**, IMC_NB · coloured by cell type · `z_RUNS/IMC_NB_CIM_VICReg/umap.png`*
 
 | Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
 |-------|------------|-------------|-----|-----|-----------|--------------|
@@ -297,8 +297,8 @@ All metrics are computed on frozen features (no fine-tuning) at each validation 
 
 11 fine cell types, same 31 markers, ~237k cells. Results at `z_RUNS/IMC_NB_FineCT_<MODEL>_VICReg/`.
 
-![UMAP — CIM](z_RUNS/IMC_NB_FineCT_CIM_VICReg/umap.png)
-*UMAP of CIM embeddings, IMC_NB_FineCT*
+![UMAP — CIM + VICReg, IMC_NB_FineCT, coloured by cell type](z_RUNS/IMC_NB_FineCT_CIM_VICReg/umap.png)
+*UMAP — **CIM + VICReg**, IMC_NB_FineCT · coloured by cell type · `z_RUNS/IMC_NB_FineCT_CIM_VICReg/umap.png`*
 
 | Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
 |-------|------------|-------------|-----|-----|-----------|--------------|
@@ -320,11 +320,11 @@ All metrics are computed on frozen features (no fine-tuning) at each validation 
 
 16 cell types, 37 markers, ~196k cells. The most heavily studied dataset with multiple variants. Results at `z_RUNS/MIBI_TNBC_<MODEL>_VICReg/`.
 
-![UMAP — CIM (cell type)](z_RUNS/MIBI_TNBC_CIM_VICReg/umap.png)
-*UMAP of CIM embeddings, MIBI_TNBC (coloured by cell type)*
+![UMAP — CIM + VICReg, MIBI_TNBC, coloured by cell type](z_RUNS/MIBI_TNBC_CIM_VICReg/umap.png)
+*UMAP — **CIM + VICReg**, MIBI_TNBC · coloured by cell type · `z_RUNS/MIBI_TNBC_CIM_VICReg/umap.png`*
 
-![UMAP — CIM (sample)](z_RUNS/MIBI_TNBC_CIM_VICReg/umap_sample.png)
-*UMAP of CIM embeddings, MIBI_TNBC (coloured by patient sample — checks for batch effect)*
+![UMAP — CIM + VICReg, MIBI_TNBC, coloured by patient sample](z_RUNS/MIBI_TNBC_CIM_VICReg/umap_sample.png)
+*UMAP — **CIM + VICReg**, MIBI_TNBC · coloured by **patient sample** (checks for inter-sample fragmentation) · `z_RUNS/MIBI_TNBC_CIM_VICReg/umap_sample.png`*
 
 | Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
 |-------|------------|-------------|-----|-----|-----------|--------------|
@@ -336,15 +336,19 @@ All metrics are computed on frozen features (no fine-tuning) at each validation 
 | CIMATT_Gate | **0.8454** | 0.5598 | 0.306 | 0.121 | −0.088 | 0.706 |
 | CIMATT_Gate_LowAug | 0.8476 | 0.5861 | 0.300 | 0.143 | −0.082 | 0.723 |
 
-**UMAP examples:**
+**UMAP comparison across all models — MIBI_TNBC, coloured by cell type:**
 
-| CIM | CIM_Norm | CIM_ProgFusion |
-|-----|----------|----------------|
-| ![](z_RUNS/MIBI_TNBC_CIM_VICReg/umap.png) | ![](z_RUNS/MIBI_TNBC_CIM_Norm_VICReg/umap.png) | ![](z_RUNS/MIBI_TNBC_CIM_ProgFusion_VICReg/umap.png) |
+| CIM + VICReg | CIM_Norm + VICReg | CIM_ProgFusion + VICReg |
+|:---:|:---:|:---:|
+| ![UMAP — CIM + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_CIM_VICReg/umap.png) | ![UMAP — CIM_Norm + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_CIM_Norm_VICReg/umap.png) | ![UMAP — CIM_ProgFusion + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_CIM_ProgFusion_VICReg/umap.png) |
+| sil = −0.094 | sil = **+0.002** | sil = **+0.001** |
 
-| EarlyFusion32 | ResNet | CIMATT_Gate |
-|---------------|--------|-------------|
-| ![](z_RUNS/MIBI_TNBC_EarlyFusion32_VICReg/umap.png) | ![](z_RUNS/MIBI_TNBC_ResNet_VICReg/umap.png) | ![](z_RUNS/MIBI_TNBC_CIMATT_Gate_VICReg/umap.png) |
+| EarlyFusion32 + VICReg | ResNet + VICReg | CIMATT_Gate + VICReg |
+|:---:|:---:|:---:|
+| ![UMAP — EarlyFusion32 + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_EarlyFusion32_VICReg/umap.png) | ![UMAP — ResNet + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_ResNet_VICReg/umap.png) | ![UMAP — CIMATT_Gate + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_CIMATT_Gate_VICReg/umap.png) |
+| sil = −0.205 | sil = −0.151 | sil = −0.088 |
+
+> The silhouette score (cosine distance) quantifies embedding compactness: CIM_Norm and CIM_ProgFusion are the only models with non-negative silhouette, visible as well-separated clusters in the UMAPs. EarlyFusion32 shows strong inter-sample fragmentation.
 
 **Key observations:**
 - CIM_Norm and CIM_ProgFusion both push the silhouette to near zero (+0.002, +0.001), confirming that input normalisation is the critical ingredient for sample-invariant embeddings on MIBI_TNBC.
@@ -375,15 +379,60 @@ Individual split results in `z_RUNS/MIBI_TNBC_CV{0-4}_<MODEL>_VICReg/`.
 **Individual CV split results:**
 
 <details>
-<summary>CIM — per-split</summary>
+<summary>CIM + VICReg — per-split</summary>
 
 | Split | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
 |-------|------------|-------------|-----|-----|-----------|--------------|
-| CV0 | `z_RUNS/MIBI_TNBC_CV0_CIM_VICReg/` | | | | | |
-| CV1 | `z_RUNS/MIBI_TNBC_CV1_CIM_VICReg/` | | | | | |
-| CV2 | `z_RUNS/MIBI_TNBC_CV2_CIM_VICReg/` | | | | | |
-| CV3 | `z_RUNS/MIBI_TNBC_CV3_CIM_VICReg/` | | | | | |
-| CV4 | `z_RUNS/MIBI_TNBC_CV4_CIM_VICReg/` | | | | | |
+| CV0 | 0.797 | 0.508 | 0.274 | 0.097 | −0.060 | 0.764 |
+| CV1 | 0.832 | 0.544 | 0.290 | 0.106 | −0.055 | 0.771 |
+| CV2 | 0.801 | 0.561 | 0.311 | 0.135 | −0.060 | 0.799 |
+| CV3 | 0.817 | 0.524 | 0.265 | 0.088 | −0.127 | 0.807 |
+| CV4 | 0.803 | 0.518 | 0.261 | 0.076 | −0.107 | 0.719 |
+| **Mean** | **0.810** | **0.531** | **0.280** | **0.100** | **−0.082** | **0.772** |
+| **±Std** | ±0.013 | ±0.019 | ±0.018 | ±0.020 | ±0.030 | ±0.031 |
+
+</details>
+
+<details>
+<summary>CIM_Norm + VICReg — per-split</summary>
+
+| Split | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
+|-------|------------|-------------|-----|-----|-----------|--------------|
+| CV0 | 0.804 | 0.496 | 0.287 | 0.109 | +0.003 | 0.764 |
+| CV1 | 0.831 | 0.533 | 0.329 | 0.135 | +0.018 | 0.786 |
+| CV2 | 0.805 | 0.552 | 0.309 | 0.119 | +0.027 | 0.805 |
+| CV3 | 0.804 | 0.493 | 0.332 | 0.141 | −0.042 | 0.811 |
+| CV4 | 0.801 | 0.534 | 0.315 | 0.165 | +0.006 | 0.738 |
+| **Mean** | **0.809** | **0.522** | **0.314** | **0.134** | **+0.003** | **0.781** |
+| **±Std** | ±0.011 | ±0.023 | ±0.016 | ±0.019 | ±0.024 | ±0.027 |
+
+</details>
+
+<details>
+<summary>CIM_ProgFusion + VICReg — per-split</summary>
+
+| Split | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
+|-------|------------|-------------|-----|-----|-----------|--------------|
+| CV0 | 0.790 | 0.499 | 0.329 | 0.125 | +0.023 | 0.770 |
+| CV1 | 0.810 | 0.554 | 0.334 | 0.147 | +0.025 | 0.794 |
+| CV2 | 0.791 | 0.556 | 0.323 | 0.105 | +0.052 | 0.810 |
+| CV3 | 0.813 | 0.510 | 0.346 | 0.131 | −0.003 | 0.817 |
+| CV4 | 0.792 | 0.514 | 0.331 | 0.134 | +0.028 | 0.737 |
+| **Mean** | **0.799** | **0.527** | **0.333** | **0.128** | **+0.025** | **0.786** |
+| **±Std** | ±0.010 | ±0.024 | ±0.008 | ±0.014 | ±0.018 | ±0.029 |
+
+</details>
+
+<details>
+<summary>EarlyFusion32 + VICReg — per-split (n=3)</summary>
+
+| Split | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
+|-------|------------|-------------|-----|-----|-----------|--------------|
+| CV0 | 0.801 | 0.386 | 0.210 | 0.076 | −0.162 | 0.712 |
+| CV1 | 0.815 | 0.395 | 0.215 | 0.077 | −0.253 | 0.712 |
+| CV2 | 0.796 | 0.427 | 0.210 | 0.066 | −0.229 | 0.752 |
+| **Mean** | **0.804** | **0.403** | **0.212** | **0.073** | **−0.214** | **0.726** |
+| **±Std** | ±0.008 | ±0.017 | ±0.003 | ±0.005 | ±0.039 | ±0.019 |
 
 </details>
 
@@ -446,11 +495,13 @@ The linear probe consistently outperforms kNN by 15–25pp (e.g., CODEX_cHL: LP 
 
 ## Region Analysis
 
-The CIM backbone (trained on single cells) generalises to tissue region discovery via sliding-window patching. See `notebooks/region_analysis.ipynb`.
+The **CIM + VICReg** backbone (trained on CODEX_cHL single cells) generalises to tissue region discovery via sliding-window patching without any retraining or spatial supervision. See `notebooks/region_analysis.ipynb`.
+
+**Model used:** `z_RUNS/CODEX_cHL_CIM_VICReg/` (CIM + VICReg, 1k iterations)
 
 **Pipeline:**
-1. Extract overlapping spatial patches (ps64: 64×64px, 50% stride; ps128: 128×128px, 50% stride) from full tissue images
-2. Embed each patch with the frozen CIM backbone
+1. Extract overlapping spatial patches (ps64: 64×64px, 50% stride; ps128: 128×128px, 50% stride) from full CODEX_cHL tissue images
+2. Embed each patch with the **frozen CIM backbone** (`AdaptiveAvgPool2d` accepts any spatial size)
 3. PCA (64 components) → MiniBatchKMeans (k ∈ {2, 4, 8, 12, 16})
 4. Interpret clusters by the cell-type composition of cells whose centre falls within each patch
 
@@ -460,10 +511,12 @@ All results stored at `z_RUNS/region_analysis/ps{PATCH_SIZE}/k_{k}/`.
 
 ### k=2 — Fundamental tissue dichotomy
 
-| | ps64 | ps128 |
+*Embeddings from **CIM + VICReg** (CODEX_cHL). UMAP coloured by region cluster.*
+
+| | ps64 (64×64 px patches) | ps128 (128×128 px patches) |
 |---|---|---|
-| UMAP | ![](z_RUNS/region_analysis/ps64/k_2/umap.png) | ![](z_RUNS/region_analysis/ps128/k_2/umap.png) |
-| Spatial map | ![](z_RUNS/region_analysis/ps64/k_2/spatial_map.png) | ![](z_RUNS/region_analysis/ps128/k_2/spatial_map.png) |
+| UMAP of patch embeddings | ![Region UMAP — CIM + VICReg, CODEX_cHL, ps64, k=2](z_RUNS/region_analysis/ps64/k_2/umap.png) | ![Region UMAP — CIM + VICReg, CODEX_cHL, ps128, k=2](z_RUNS/region_analysis/ps128/k_2/umap.png) |
+| Spatial map | ![Spatial map — CIM + VICReg, CODEX_cHL, ps64, k=2](z_RUNS/region_analysis/ps64/k_2/spatial_map.png) | ![Spatial map — CIM + VICReg, CODEX_cHL, ps128, k=2](z_RUNS/region_analysis/ps128/k_2/spatial_map.png) |
 
 The first split separates the two fundamental tissue compartments in cHL:
 
@@ -478,16 +531,18 @@ This dichotomy is consistent across both patch sizes, confirming it reflects gen
 
 ### k=4 — Stromal and vascular compartments emerge
 
-| | ps64 | ps128 |
+*Embeddings from **CIM + VICReg** (CODEX_cHL).*
+
+| | ps64 (64×64 px patches) | ps128 (128×128 px patches) |
 |---|---|---|
-| Composition | ![](z_RUNS/region_analysis/ps64/k_4/composition.png) | ![](z_RUNS/region_analysis/ps128/k_4/composition.png) |
-| Spatial map | ![](z_RUNS/region_analysis/ps64/k_4/spatial_map.png) | ![](z_RUNS/region_analysis/ps128/k_4/spatial_map.png) |
+| Cell-type composition per cluster | ![Composition — CIM + VICReg, CODEX_cHL, ps64, k=4](z_RUNS/region_analysis/ps64/k_4/composition.png) | ![Composition — CIM + VICReg, CODEX_cHL, ps128, k=4](z_RUNS/region_analysis/ps128/k_4/composition.png) |
+| Spatial map | ![Spatial map — CIM + VICReg, CODEX_cHL, ps64, k=4](z_RUNS/region_analysis/ps64/k_4/spatial_map.png) | ![Spatial map — CIM + VICReg, CODEX_cHL, ps128, k=4](z_RUNS/region_analysis/ps128/k_4/spatial_map.png) |
 
 ---
 
 ### k=8 — Most informative granularity (ps64)
 
-Verified directly from `z_RUNS/region_analysis/ps64/k_8/results.json`:
+Verified directly from `z_RUNS/region_analysis/ps64/k_8/results.json`. Embeddings from **CIM + VICReg** (CODEX_cHL).
 
 | Cluster | Size | Top cell types | Interpretation |
 |---------|------|---------------|----------------|
@@ -500,21 +555,25 @@ Verified directly from `z_RUNS/region_analysis/ps64/k_8/results.json`:
 | C7 | 6,734 | Other **22.2%**, M2 14.2%, CD4 18.0%, Endothelial 7.9% | **Dense stroma** — stromal cells + M2 macrophages |
 | C0 | 5,179 | Endothelial **23.7%**, CD4 18.1%, CD8 12.0%, M2 7.8% | **Vascular / perivascular** — endothelial-enriched zone |
 
-| UMAP (k=8) | Spatial map | Composition |
-|---|---|---|
-| ![](z_RUNS/region_analysis/ps64/k_8/umap.png) | ![](z_RUNS/region_analysis/ps64/k_8/spatial_map.png) | ![](z_RUNS/region_analysis/ps64/k_8/composition.png) |
+*Embeddings from **CIM + VICReg** (CODEX_cHL), 64×64 px patches.*
 
-| Spatial map with pies (ps64, k=8) |
-|---|
-| ![](z_RUNS/region_analysis/ps64/k_8/spatial_map_with_pie.png) |
+| UMAP of patch embeddings (k=8) | Spatial tissue map | Cell-type composition per cluster |
+|:---:|:---:|:---:|
+| ![Region UMAP — CIM + VICReg, CODEX_cHL, ps64, k=8](z_RUNS/region_analysis/ps64/k_8/umap.png) | ![Spatial map — CIM + VICReg, CODEX_cHL, ps64, k=8](z_RUNS/region_analysis/ps64/k_8/spatial_map.png) | ![Composition — CIM + VICReg, CODEX_cHL, ps64, k=8](z_RUNS/region_analysis/ps64/k_8/composition.png) |
+
+| Spatial map with per-cluster cell-type pie charts — CIM + VICReg, CODEX_cHL, ps64, k=8 |
+|:---:|
+| ![Spatial map with pies — CIM + VICReg, CODEX_cHL, ps64, k=8](z_RUNS/region_analysis/ps64/k_8/spatial_map_with_pie.png) |
 
 ---
 
 ### k=12 and k=16 — Further sub-compartment resolution
 
-| k=12 spatial (ps64) | k=16 spatial (ps64) |
-|---|---|
-| ![](z_RUNS/region_analysis/ps64/k_12/spatial_map.png) | ![](z_RUNS/region_analysis/ps64/k_16/spatial_map.png) |
+*Embeddings from **CIM + VICReg** (CODEX_cHL), 64×64 px patches.*
+
+| Spatial map — k=12 | Spatial map — k=16 |
+|:---:|:---:|
+| ![Spatial map — CIM + VICReg, CODEX_cHL, ps64, k=12](z_RUNS/region_analysis/ps64/k_12/spatial_map.png) | ![Spatial map — CIM + VICReg, CODEX_cHL, ps64, k=16](z_RUNS/region_analysis/ps64/k_16/spatial_map.png) |
 
 At k≥12 the tumour niche begins to split into sub-regions (e.g. dense core vs infiltrating rim), and the T-cell zone separates into CD4-dominant and CD8-enriched sub-areas.
 
