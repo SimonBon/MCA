@@ -262,7 +262,7 @@ All metrics are computed on frozen features (no fine-tuning) at each validation 
 | **CIM** | **0.7005** | 0.3613 | 0.195 | 0.102 | −0.050 | 0.592 |
 | CIM_Norm | 0.6954 | 0.3910 | **0.247** | 0.098 | **−0.013** | **0.624** |
 | CIM_ProgFusion | 0.6883 | **0.4035** | 0.253 | **0.107** | −0.065 | 0.619 |
-| EarlyFusion32 | 0.7003 | 0.3901 | 0.189 | 0.055 | −0.192 | 0.627 |
+| EarlyFusion32 | 0.7003 | 0.3901 | 0.189 | 0.055 | −0.192 | 0.626 |
 | ResNet | 0.5033 | 0.3366 | 0.222 | 0.071 | −0.094 | 0.615 |
 
 **Key observations:**
@@ -283,7 +283,7 @@ All metrics are computed on frozen features (no fine-tuning) at each validation 
 | Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
 |-------|------------|-------------|-----|-----|-----------|--------------|
 | CIM | 0.8042 | 0.6422 | 0.270 | 0.193 | +0.058 | 0.787 |
-| **EarlyFusion32** | **0.8310** | 0.6777 | 0.276 | 0.188 | **+0.062** | 0.822 |
+| **EarlyFusion32** | **0.8310** | 0.6777 | 0.276 | 0.188 | **+0.061** | 0.822 |
 | ResNet | 0.8021 | **0.6948** | **0.313** | 0.173 | +0.050 | **0.833** |
 
 **Key observations:**
@@ -302,10 +302,10 @@ All metrics are computed on frozen features (no fine-tuning) at each validation 
 
 | Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
 |-------|------------|-------------|-----|-----|-----------|--------------|
-| CIM | 0.8043 | 0.6086 | 0.263 | 0.176 | −0.008 | 0.708 |
+| CIM | 0.8043 | 0.6086 | 0.263 | 0.176 | −0.008 | 0.707 |
 | CIM_Norm | 0.8222 | 0.5911 | 0.289 | 0.142 | +0.011 | 0.738 |
 | CIM_ProgFusion | 0.8143 | 0.6115 | 0.288 | 0.143 | **+0.030** | 0.742 |
-| **EarlyFusion32** | **0.8209** | **0.6548** | 0.281 | **0.151** | +0.035 | **0.755** |
+| **EarlyFusion32** | **0.8209** | **0.6548** | 0.284 | **0.151** | +0.035 | **0.755** |
 | ResNet | 0.7739 | 0.6256 | **0.332** | 0.170 | +0.050 | 0.779 |
 
 **Key observations:**
