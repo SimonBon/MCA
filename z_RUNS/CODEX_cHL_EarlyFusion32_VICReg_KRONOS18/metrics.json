@@ -1,0 +1,231 @@
+{
+  "classes": [
+    "B",
+    "CD4",
+    "CD8",
+    "DC",
+    "Endothelial",
+    "Epithelial",
+    "Lymphatic",
+    "M1",
+    "M2",
+    "Mast",
+    "Monocyte",
+    "NK",
+    "Neutrophil",
+    "Other",
+    "TReg",
+    "Tumor"
+  ],
+  "n_classes": 16,
+  "feature_dim": 576,
+  "linear_probe": {
+    "train": {
+      "top1_accuracy": 0.7124059213477546,
+      "top2_accuracy": 0.8819418830683348,
+      "top1_balanced_accuracy": 0.7646401804105762,
+      "top2_balanced_accuracy": 0.9047963443495615,
+      "precision": 0.7547078296315384,
+      "f1": 0.7180268017302519,
+      "n_samples": 100315
+    },
+    "val": {
+      "top1_accuracy": 0.6778832728288188,
+      "top2_accuracy": 0.863585590617146,
+      "top1_balanced_accuracy": 0.7098889825280215,
+      "top2_balanced_accuracy": 0.8684655900900563,
+      "precision": 0.7230367824728012,
+      "f1": 0.6863278923668085,
+      "n_samples": 14324,
+      "mean_average_precision": 0.7221630432093931,
+      "per_class_ap": {
+        "B": 0.7948,
+        "CD4": 0.8379,
+        "CD8": 0.8716,
+        "DC": 0.7019,
+        "Endothelial": 0.8162,
+        "Epithelial": 0.2549,
+        "Lymphatic": 0.9035,
+        "M1": 0.5319,
+        "M2": 0.7049,
+        "Mast": 0.8025,
+        "Monocyte": 0.5623,
+        "NK": 0.7491,
+        "Neutrophil": 0.7644,
+        "Other": 0.5486,
+        "TReg": 0.7838,
+        "Tumor": 0.9264
+      }
+    }
+  },
+  "knn": {
+    "k": 15,
+    "val": {
+      "top1_accuracy": 0.7136274783580006,
+      "top1_balanced_accuracy": 0.6124571357770621,
+      "f1": 0.7034795579329811
+    }
+  },
+  "clustering": {
+    "method": "MiniBatchKMeans(k=16, n_init=10)",
+    "val": {
+      "nmi": 0.3403011951959314,
+      "ari": 0.16783586072234338
+    },
+    "all": {
+      "nmi": 0.3405709651911081,
+      "ari": 0.167775542414304
+    }
+  },
+  "neighbourhood_purity": {
+    "k": 15,
+    "mean_purity": 0.583361258493903,
+    "mean_lift": 11.215277921903548,
+    "per_class": {
+      "B": {
+        "purity": 0.6537368746139592,
+        "expected_chance": 0.11302708740575258,
+        "purity_lift": 5.783895609617265,
+        "n_cells": 1619
+      },
+      "CD4": {
+        "purity": 0.6646383773685615,
+        "expected_chance": 0.2615889416364144,
+        "purity_lift": 2.540773983834341,
+        "n_cells": 3747
+      },
+      "CD8": {
+        "purity": 0.6745052386495926,
+        "expected_chance": 0.11993856464674672,
+        "purity_lift": 5.623756134119187,
+        "n_cells": 1718
+      },
+      "DC": {
+        "purity": 0.5100726895119418,
+        "expected_chance": 0.0672298240714884,
+        "purity_lift": 7.587000212428926,
+        "n_cells": 963
+      },
+      "Endothelial": {
+        "purity": 0.6622222222222223,
+        "expected_chance": 0.06073722423903937,
+        "purity_lift": 10.903070242656451,
+        "n_cells": 870
+      },
+      "Epithelial": {
+        "purity": 0.03601190476190476,
+        "expected_chance": 0.015638089919017033,
+        "purity_lift": 2.3028326955782314,
+        "n_cells": 224
+      },
+      "Lymphatic": {
+        "purity": 0.674822695035461,
+        "expected_chance": 0.02624965093549288,
+        "purity_lift": 25.707873094914742,
+        "n_cells": 376
+      },
+      "M1": {
+        "purity": 0.3627956989247312,
+        "expected_chance": 0.02164199944149679,
+        "purity_lift": 16.763501907734998,
+        "n_cells": 310
+      },
+      "M2": {
+        "purity": 0.5151098901098901,
+        "expected_chance": 0.05082379223680536,
+        "purity_lift": 10.13521162903031,
+        "n_cells": 728
+      },
+      "Mast": {
+        "purity": 0.2761044176706827,
+        "expected_chance": 0.02317788327282882,
+        "purity_lift": 11.91240867082789,
+        "n_cells": 332
+      },
+      "Monocyte": {
+        "purity": 0.3218523878437048,
+        "expected_chance": 0.04824071488411058,
+        "purity_lift": 6.671799715590778,
+        "n_cells": 691
+      },
+      "NK": {
+        "purity": 0.4764893133242383,
+        "expected_chance": 0.05117285674392628,
+        "purity_lift": 9.311368245643095,
+        "n_cells": 733
+      },
+      "Neutrophil": {
+        "purity": 0.5663751214771623,
+        "expected_chance": 0.023945825188494835,
+        "purity_lift": 23.652353469501087,
+        "n_cells": 343
+      },
+      "Other": {
+        "purity": 0.427843137254902,
+        "expected_chance": 0.03560457972633343,
+        "purity_lift": 12.016519800076892,
+        "n_cells": 510
+      },
+      "TReg": {
+        "purity": 0.3534328358208955,
+        "expected_chance": 0.023387321977101368,
+        "purity_lift": 15.112155045667187,
+        "n_cells": 335
+      },
+      "Tumor": {
+        "purity": 0.7729292929292929,
+        "expected_chance": 0.05759564367495113,
+        "purity_lift": 13.419926293235383,
+        "n_cells": 825
+      }
+    }
+  },
+  "silhouette": {
+    "score": 0.009551145136356354,
+    "n_samples": 10000,
+    "metric": "cosine"
+  },
+  "umap": {
+    "saved": true,
+    "n_neighbors": 15,
+    "min_dist": 0.1,
+    "metric": "cosine"
+  },
+  "train": {
+    "top1_accuracy": 0.7124059213477546,
+    "top2_accuracy": 0.8819418830683348,
+    "top1_balanced_accuracy": 0.7646401804105762,
+    "top2_balanced_accuracy": 0.9047963443495615,
+    "precision": 0.7547078296315384,
+    "f1": 0.7180268017302519,
+    "n_samples": 100315
+  },
+  "val": {
+    "top1_accuracy": 0.6778832728288188,
+    "top2_accuracy": 0.863585590617146,
+    "top1_balanced_accuracy": 0.7098889825280215,
+    "top2_balanced_accuracy": 0.8684655900900563,
+    "precision": 0.7230367824728012,
+    "f1": 0.6863278923668085,
+    "n_samples": 14324,
+    "mean_average_precision": 0.7221630432093931,
+    "per_class_ap": {
+      "B": 0.7948,
+      "CD4": 0.8379,
+      "CD8": 0.8716,
+      "DC": 0.7019,
+      "Endothelial": 0.8162,
+      "Epithelial": 0.2549,
+      "Lymphatic": 0.9035,
+      "M1": 0.5319,
+      "M2": 0.7049,
+      "Mast": 0.8025,
+      "Monocyte": 0.5623,
+      "NK": 0.7491,
+      "Neutrophil": 0.7644,
+      "Other": 0.5486,
+      "TReg": 0.7838,
+      "Tumor": 0.9264
+    }
+  }
+}
