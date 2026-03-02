@@ -5,6 +5,10 @@ Loads pre-extracted features from train_results.npz / val_results.npz
 (produced by EvaluateModelRich), fits a linear probe at several label
 fractions, and saves results as JSON + PNG.
 
+Sampling is done per-class: at fraction f, max(1, round(n_class * f)) cells
+are drawn from each class independently, so rare classes always contribute
+at least one labeled example.
+
 Usage:
     python tools/label_efficiency.py z_RUNS/CODEX_cHL_CIM_VICReg_KRONOS18
     python tools/label_efficiency.py z_RUNS/CODEX_cHL_CIM_VICReg_KRONOS18 \\
@@ -21,11 +25,27 @@ import matplotlib.pyplot as plt
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import balanced_accuracy_score, average_precision_score
-from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.preprocessing import label_binarize
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _sample_per_class(train_labels, frac, n_classes, rng):
+    """Return indices sampling `frac` from each class independently.
+
+    Takes max(1, round(n_class * frac)) cells per class so that even the
+    rarest class always contributes at least one labeled example.
+    """
+    indices = []
+    for c in range(n_classes):
+        class_idx = np.where(train_labels == c)[0]
+        if len(class_idx) == 0:
+            continue
+        n_take = max(1, int(round(len(class_idx) * frac)))
+        n_take = min(n_take, len(class_idx))
+        indices.append(rng.choice(class_idx, n_take, replace=False))
+    return np.concatenate(indices)
+
 
 def _lp_metrics(train_feats, train_labels, val_feats, val_labels,
                 n_classes, epochs, n_jobs):
@@ -72,25 +92,27 @@ def run(work_dir, fractions, n_repeats, epochs, n_jobs):
     classes      = list(train_npz['classes'])
     n_classes    = len(classes)
 
+    # per-class counts for reporting
+    class_counts = np.bincount(train_labels, minlength=n_classes)
     print(f"Train: {len(train_feats)} cells  |  Val: {len(val_feats)} cells  |  "
           f"Classes ({n_classes}): {classes}")
+    print(f"Train class counts: { {c: int(class_counts[i]) for i, c in enumerate(classes)} }")
 
     # ── Evaluate at each fraction ─────────────────────────────────────────────
-    results = {}   # fraction -> {'bal_acc': [...], 'mean_ap': [...]}
+    results = {}
 
     for frac in fractions:
         bal_accs, mean_aps = [], []
-        n_labeled = int(round(len(train_feats) * frac))
-        # Need at least 1 sample per class; skip if impossible
-        if n_labeled < n_classes:
-            print(f"  frac={frac:.2f}: only {n_labeled} samples < {n_classes} classes — skipping")
-            continue
 
+        # compute actual n_labeled as sum of per-class samples
+        n_labeled = sum(
+            max(1, int(round(int(class_counts[c]) * frac)))
+            for c in range(n_classes) if class_counts[c] > 0
+        )
         label_str = f"{frac*100:.0f}%"
-        print(f"\n  Fraction {label_str} ({n_labeled} samples), {n_repeats} repeat(s):")
+        print(f"\n  Fraction {label_str} (~{n_labeled} samples, {n_repeats} repeat(s)):")
 
         if frac >= 1.0:
-            # Use full training set — no subsampling needed
             ba, ap = _lp_metrics(train_feats, train_labels,
                                   val_feats, val_labels,
                                   n_classes, epochs, n_jobs)
@@ -98,9 +120,9 @@ def run(work_dir, fractions, n_repeats, epochs, n_jobs):
             mean_aps.append(ap)
             print(f"    bal_acc={ba:.4f}  mean_ap={ap:.4f}")
         else:
-            sss = StratifiedShuffleSplit(
-                n_splits=n_repeats, train_size=frac, random_state=42)
-            for rep, (idx, _) in enumerate(sss.split(train_feats, train_labels)):
+            for rep in range(n_repeats):
+                rng = np.random.default_rng(seed=42 + rep)
+                idx = _sample_per_class(train_labels, frac, n_classes, rng)
                 ba, ap = _lp_metrics(
                     train_feats[idx], train_labels[idx],
                     val_feats, val_labels,
@@ -108,11 +130,11 @@ def run(work_dir, fractions, n_repeats, epochs, n_jobs):
                 )
                 bal_accs.append(ba)
                 mean_aps.append(ap)
-                print(f"    rep {rep+1}: bal_acc={ba:.4f}  mean_ap={ap:.4f}")
+                print(f"    rep {rep+1} (n={len(idx)}): bal_acc={ba:.4f}  mean_ap={ap:.4f}")
 
         results[frac] = {
-            'n_labeled':   n_labeled,
-            'n_repeats':   len(bal_accs),
+            'n_labeled':    n_labeled,
+            'n_repeats':    len(bal_accs),
             'bal_acc_mean': float(np.mean(bal_accs)),
             'bal_acc_std':  float(np.std(bal_accs)),
             'mean_ap_mean': float(np.mean(mean_aps)),
@@ -162,7 +184,6 @@ def run(work_dir, fractions, n_repeats, epochs, n_jobs):
         ax.set_xlabel('# labeled training cells')
         ax.set_ylabel(ylabel)
         ax.grid(True, which='both', linestyle=':', alpha=0.5)
-        # annotate each point with the fraction label
         for frac, xi, yi in zip(sorted_fracs, x, means):
             ax.annotate(f'{frac*100:.0f}%', xy=(xi, yi),
                         xytext=(0, 8), textcoords='offset points',
@@ -187,7 +208,7 @@ if __name__ == '__main__':
                         default=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0],
                         help='Label fractions to evaluate (default: 0.01 0.05 0.1 0.25 0.5 1.0)')
     parser.add_argument('--n_repeats', type=int, default=3,
-                        help='Stratified repeats per fraction (default: 3; '
+                        help='Repeats per fraction with different random seeds (default: 3; '
                              'fraction=1.0 always uses 1 repeat)')
     parser.add_argument('--epochs', type=int, default=2000,
                         help='Max LP solver iterations (default: 2000)')
