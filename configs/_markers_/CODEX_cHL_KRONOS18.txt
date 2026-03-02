@@ -1,0 +1,37 @@
+# 18-marker panel matching KRONOS (arXiv:2506.03373, Mahmood Lab)
+# Source: mahmoodlab/KRONOS tutorials/2 - Cell-phenotyping.ipynb
+#
+# IMPORTANT: verify each name against your HDF5 before running:
+#   python3 -c "import h5py,numpy as np; f=h5py.File('<H5_PATH>','r'); print([x.decode() for x in f['marker_names'][:]])"
+#
+# Risky markers:
+#   FoxP3 + CD56 were excluded from the standard 41-marker panel due to poor
+#   CODEX staining SNR. They are included here to match KRONOS exactly but
+#   may hurt performance. Remove them and set n_markers=16 if staining is poor.
+#
+# Name mapping from KRONOS -> likely HDF5 name used below:
+#   DAPI-01     -> DAPI-01   (or DAPI, DNA1, Hoechst)
+#   CD11B       -> CD11b
+#   CD11C       -> CD11c
+#   CYTOKERITIN -> PanCK     (KRONOS typo for cytokeratin)
+#   FOXP3       -> FoxP3
+#   PODOPLANIN  -> Podoplanin  (or PDPN, D240)
+#   MCT         -> MCT        (or MCT1, MCT4)
+DAPI-01
+CD11b
+CD11c
+CD15
+CD163
+CD20
+CD206
+CD30
+CD31
+CD4
+CD56
+CD68
+CD7
+CD8
+PanCK
+FoxP3
+MCT
+Podoplanin
