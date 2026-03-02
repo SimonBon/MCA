@@ -166,7 +166,8 @@ class EvaluateModelRich(Hook):
 
         def smooth(arr, w):
             kernel = np.ones(w) / w
-            return np.convolve(arr, kernel, mode='same')
+            padded = np.pad(arr, (w // 2, w - w // 2 - 1), mode='edge')
+            return np.convolve(padded, kernel, mode='valid')
 
         loss_s     = smooth(loss,     smooth_window)
         loss_inv_s = smooth(loss_inv, smooth_window)

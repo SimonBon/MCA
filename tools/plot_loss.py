@@ -17,7 +17,8 @@ import matplotlib.pyplot as plt
 
 def smooth(arr, w):
     kernel = np.ones(w) / w
-    return np.convolve(arr, kernel, mode='same')
+    padded = np.pad(arr, (w // 2, w - w // 2 - 1), mode='edge')
+    return np.convolve(padded, kernel, mode='valid')
 
 
 def plot_loss(work_dir, smooth_window=50, zoom_frac=0.5):
