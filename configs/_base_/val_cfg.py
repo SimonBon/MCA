@@ -16,5 +16,5 @@ custom_hooks = [dict(
     val_indicies=None,
     dataset_kwargs=None,
     max_samples=5000 if os.getenv('DEBUG', '').lower() in ('1', 'true', 'yes') else None,
-    epochs=100   if os.getenv('DEBUG', '').lower() in ('1', 'true', 'yes') else 1000,
+    epochs=100   if os.getenv('DEBUG', '').lower() in ('1', 'true', 'yes') else 2000,
 )]

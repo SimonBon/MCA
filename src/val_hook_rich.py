@@ -53,7 +53,7 @@ class EvaluateModelRich(Hook):
             val_indicies,
             pipeline,
             priority='VERY_LOW',
-            epochs=1000,
+            epochs=2000,
             annotation_map=None,
             max_samples=None,
             knn_k=15,
