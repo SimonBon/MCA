@@ -160,6 +160,19 @@ def run(work_dir, fractions, n_per_class, n_repeats, epochs, n_jobs):
 
     points = []   # list of result dicts, sorted by n_labeled at the end
 
+    # ── N-per-class points ────────────────────────────────────────────────────
+    for n in sorted(set(n_per_class)):
+        label = f"{n}/cls"
+        print(f"\n  [{label}] fixed {n} cells per class, {n_repeats} repeat(s):")
+        result = _run_point(
+            label=label,
+            sample_fn=lambda rng, n_=n: _sample_by_n(train_labels, n_, n_classes, rng),
+            train_feats=train_feats, train_labels=train_labels,
+            val_feats=val_feats,     val_labels=val_labels,
+            n_classes=n_classes, n_repeats=n_repeats, epochs=epochs, n_jobs=n_jobs,
+        )
+        points.append(result)
+        
     # ── Fraction-based points ─────────────────────────────────────────────────
     for frac in sorted(set(fractions)):
         label    = f"{frac*100:.0f}%"
@@ -174,20 +187,7 @@ def run(work_dir, fractions, n_per_class, n_repeats, epochs, n_jobs):
             n_classes=n_classes, n_repeats=reps, epochs=epochs, n_jobs=n_jobs,
         )
         points.append(result)
-
-    # ── N-per-class points ────────────────────────────────────────────────────
-    for n in sorted(set(n_per_class)):
-        label = f"{n}/cls"
-        print(f"\n  [{label}] fixed {n} cells per class, {n_repeats} repeat(s):")
-        result = _run_point(
-            label=label,
-            sample_fn=lambda rng, n_=n: _sample_by_n(train_labels, n_, n_classes, rng),
-            train_feats=train_feats, train_labels=train_labels,
-            val_feats=val_feats,     val_labels=val_labels,
-            n_classes=n_classes, n_repeats=n_repeats, epochs=epochs, n_jobs=n_jobs,
-        )
-        points.append(result)
-
+        
     # sort by n_labeled for a clean plot
     points.sort(key=lambda p: p['n_labeled'])
 
