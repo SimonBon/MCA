@@ -13,7 +13,7 @@
 #   DAPI-01     -> DAPI-01   (or DAPI, DNA1, Hoechst)
 #   CD11B       -> CD11b
 #   CD11C       -> CD11c
-#   CYTOKERITIN -> PanCK     (KRONOS typo for cytokeratin)
+#   CYTOKERITIN -> Cytokeritin  (KRONOS typo preserved in HDF5)
 #   FOXP3       -> FoxP3
 #   PODOPLANIN  -> Podoplanin  (or PDPN, D240)
 #   MCT         -> MCT        (or MCT1, MCT4)
@@ -31,7 +31,7 @@ CD56
 CD68
 CD7
 CD8
-PanCK
+Cytokeritin
 FoxP3
 MCT
 Podoplanin
