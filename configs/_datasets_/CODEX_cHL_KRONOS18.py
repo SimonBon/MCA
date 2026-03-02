@@ -13,7 +13,7 @@
 # The difference likely comes from different segmentation/QC. The comparison
 # is approximate, not exact.
 
-used_markers = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/src/MCA/configs/_markers_/CODEX_cHL_KRONOS18.txt'
+used_markers = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/data/MCI_data/h5_files/CODEX_cHL/used_markers_KRONOS18.txt'
 h5_filepath  = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/data/MCI_data/h5_files/CODEX_cHL/CODEX_cHL.h5'
 
 train_indicies = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/data/MCI_data/h5_files/CODEX_cHL/train.txt'
