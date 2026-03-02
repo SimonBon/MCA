@@ -2,29 +2,64 @@ from copy import deepcopy
 
 _base_ = [
     '../../_base_/default.py',
-    '../../_augmentations_/high.py',
-    '../../_base_/train_cfg.py',
     '../../_base_/val_cfg.py',
     '../../_datasets_/CODEX_cHL_KRONOS18.py',
     '../../_backbones_/CIM.py',
     '../../_algorithms_/VICReg.py',
 ]
 
-batch_size  = 256
-num_workers = 8
+batch_size  = 512
+num_workers = 16
 mask_patch  = True
 
-_base_.val_augmentation[0].size = _base_.cutter_size
+# ── Optimiser: LARS matching reference ──────────────────────────────────────
+n_linear = 400
+n_cosine = 3600
+
+optimizer = dict(type='LARS', lr=0.3, momentum=0.9, weight_decay=1e-5)
+optim_wrapper = dict(type='OptimWrapper', optimizer=optimizer)
+
+train_cfg = dict(type='IterBasedTrainLoop', max_iters=n_linear + n_cosine)
+
+param_scheduler = [
+    dict(type='LinearLR',          start_factor=1e-4, by_epoch=False, begin=0,        end=n_linear),
+    dict(type='CosineAnnealingLR', T_max=n_cosine,    by_epoch=False, begin=n_linear, end=n_linear + n_cosine, eta_min=0.03),
+]
+
+# ── Augmentations matching reference ────────────────────────────────────────
+train_aug_strong = [
+    dict(type='C_RandomFlip',              prob=0.5, horizontal=True, vertical=True),
+    dict(type='C_RandomAffine',            angle=(0, 360), scale=(0.8, 1.2), shift=(0, 0), order=1),
+    dict(type='C_RandomChannelShiftScale', scale=(0.9, 1.2), shift=(0, 0), clip=True),
+    dict(type='C_RandomNoise',             mean=(0, 0), std=(0, 0.02), clip=True),
+    dict(type='C_RandomChannelDrop',       drop_prob=0.1),
+    dict(type='C_CentralCutter',           size=20),
+    dict(type='C_ToTensor'),
+]
+
+train_aug_weak = [
+    dict(type='C_RandomFlip',              prob=0.5, horizontal=True, vertical=True),
+    dict(type='C_RandomAffine',            angle=(0, 360), scale=(0.8, 1.2), shift=(0, 0), order=1),
+    dict(type='C_RandomChannelShiftScale', scale=(0.9, 1.2), shift=(0, 0), clip=True),
+    dict(type='C_RandomNoise',             mean=(0, 0), std=(0, 0.02), clip=True),
+    dict(type='C_RandomChannelDrop',       drop_prob=0.1),
+    dict(type='C_CentralCutter',           size=18),
+    dict(type='C_ToTensor'),
+]
+
+train_pipeline = [
+    dict(type='C_MultiView', n_views=[1, 1], transforms=[train_aug_strong, train_aug_weak]),
+    dict(type='C_PackInputs'),
+]
+
+_base_.val_augmentation[0].size = 18
 _base_.val_pipeline[0].transforms = [_base_.val_augmentation]
 
-_base_.train_aug_strong[-2].size = _base_.cutter_size
-_base_.train_aug_weak[-2].size   = _base_.cutter_size
-_base_.train_pipeline[0].transforms = [_base_.train_aug_strong, _base_.train_aug_weak]
-
+# ── Dataset ──────────────────────────────────────────────────────────────────
 train_dataset = deepcopy(_base_.dataset)
 train_dataset.update(_base_.dataset_kwargs)
 train_dataset['used_indicies'] = _base_.train_indicies
-train_dataset['pipeline']      = _base_.train_pipeline
+train_dataset['pipeline']      = train_pipeline
 train_dataset['mask_patch']    = mask_patch
 
 train_dataloader = dict(
@@ -36,6 +71,7 @@ train_dataloader = dict(
     dataset=train_dataset,
 )
 
+# ── Eval hook ────────────────────────────────────────────────────────────────
 _base_.custom_hooks[0].type           = 'EvaluateModelRich'
 _base_.custom_hooks[0].n_jobs         = 8
 _base_.custom_hooks[0].train_indicies = _base_.train_indicies
@@ -43,6 +79,7 @@ _base_.custom_hooks[0].val_indicies   = _base_.val_indicies
 _base_.custom_hooks[0].pipeline       = _base_.val_pipeline
 _base_.custom_hooks[0].dataset_kwargs = _base_.dataset_kwargs
 
+# ── Model ─────────────────────────────────────────────────────────────────────
 _base_.model.backbone             = _base_.backbone
 _base_.model.backbone.in_channels = _base_.n_markers
 _base_.model.neck.in_channels     = _base_.n_markers * _base_.features_per_marker
