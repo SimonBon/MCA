@@ -20,7 +20,7 @@ train_indicies = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData
 val_indicies   = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/data/MCI_data/h5_files/CODEX_cHL/val.txt'
 test_indicies  = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/data/MCI_data/h5_files/CODEX_cHL/test.txt'
 
-ignore_annotation = ['Seg Artifact']
+ignore_annotation = ['Seg Artifact', 'Cytotoxic CD8']
 
 patch_size = 32
 n_markers  = 18

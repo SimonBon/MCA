@@ -13,8 +13,9 @@ from sklearn.metrics import (
     accuracy_score, f1_score, balanced_accuracy_score, precision_score,
     normalized_mutual_info_score, adjusted_rand_score,
     silhouette_score, confusion_matrix, ConfusionMatrixDisplay,
+    average_precision_score,
 )
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, label_binarize
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -192,6 +193,16 @@ class EvaluateModelRich(Hook):
             },
         }
         print(f"  Val balanced acc: {metrics['linear_probe']['val']['top1_balanced_accuracy']:.4f}")
+
+        # per-class average precision (matches KRONOS paper metric)
+        val_labels_bin = label_binarize(val_labels, classes=list(range(n_classes)))
+        per_class_ap   = average_precision_score(val_labels_bin, val_proba_lr, average=None)
+        mean_ap        = float(np.mean(per_class_ap))
+        metrics['linear_probe']['val']['mean_average_precision'] = mean_ap
+        metrics['linear_probe']['val']['per_class_ap'] = {
+            cls: round(float(per_class_ap[i]), 4) for i, cls in enumerate(classes)
+        }
+        print(f"  Val mean AP:      {mean_ap:.4f}")
 
         # ── 2. k-NN ────────────────────────────────────────────────────────
         print(f"\n=== 2. k-NN (k={self.knn_k}, cosine, distance-weighted) ===")
