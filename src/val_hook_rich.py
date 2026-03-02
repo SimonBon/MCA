@@ -175,14 +175,21 @@ class EvaluateModelRich(Hook):
         loss_cov_s = smooth(loss_cov, smooth_window)
 
         n       = len(steps)
-        zoom_i  = int(n * (1 - zoom_frac))   # index where zoom window starts
-        alpha_r = 0.15                         # raw trace alpha
+        zoom_i  = int(n * (1 - zoom_frac))
+        alpha_r = 0.15
+        zs      = steps[zoom_i:]
 
-        fig, axes = plt.subplots(3, 1, figsize=(12, 12),
-                                 gridspec_kw={'hspace': 0.45})
+        fig = plt.figure(figsize=(14, 13))
+        gs  = fig.add_gridspec(3, 3, hspace=0.50, wspace=0.35,
+                               height_ratios=[1, 1, 1])
+        ax_full = fig.add_subplot(gs[0, :])
+        ax_zoom = fig.add_subplot(gs[1, :])
+        ax_inv  = fig.add_subplot(gs[2, 0])
+        ax_var  = fig.add_subplot(gs[2, 1])
+        ax_cov  = fig.add_subplot(gs[2, 2])
 
         # ── Row 0: full curve, log y ───────────────────────────────────────
-        ax = axes[0]
+        ax = ax_full
         ax.plot(steps, loss,   color='steelblue', alpha=alpha_r, linewidth=0.5)
         ax.plot(steps, loss_s, color='steelblue', linewidth=1.8, label='total loss (smoothed)')
         ax.set_yscale('log')
@@ -197,16 +204,14 @@ class EvaluateModelRich(Hook):
         lines1, labels1 = ax.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
         ax.legend(lines1 + lines2, labels1 + labels2, fontsize=8, loc='upper right')
-        # shade warmup
         warmup_end = steps[np.argmax(lr)]
-        ax.axvspan(steps[0], warmup_end, alpha=0.08, color='orange', label='warmup')
+        ax.axvspan(steps[0], warmup_end, alpha=0.08, color='orange')
 
         # ── Row 1: zoomed total loss, linear y ────────────────────────────
-        ax = axes[1]
-        zs, zl, zls = steps[zoom_i:], loss[zoom_i:], loss_s[zoom_i:]
-        ax.plot(zs, zl,  color='steelblue', alpha=alpha_r, linewidth=0.5)
-        ax.plot(zs, zls, color='steelblue', linewidth=1.8)
-        # tight y-limits: 1st–99th percentile of smoothed values
+        ax = ax_zoom
+        zls = loss_s[zoom_i:]
+        ax.plot(zs, loss[zoom_i:], color='steelblue', alpha=alpha_r, linewidth=0.5)
+        ax.plot(zs, zls,           color='steelblue', linewidth=1.8)
         lo, hi = np.nanpercentile(zls, 1), np.nanpercentile(zls, 99)
         pad = (hi - lo) * 0.15
         ax.set_ylim(lo - pad, hi + pad)
@@ -215,29 +220,21 @@ class EvaluateModelRich(Hook):
         ax.set_title(f'Last {int(zoom_frac*100)}% of training — total loss (linear, clipped)')
         ax.grid(axis='y', linestyle=':', alpha=0.5)
 
-        # ── Row 2: component losses, zoomed ───────────────────────────────
-        ax = axes[2]
-        components = [
-            (loss_inv_s[zoom_i:], steps[zoom_i:], 'invariance', 'C0'),
-            (loss_var_s[zoom_i:], steps[zoom_i:], 'variance',   'C1'),
-            (loss_cov_s[zoom_i:], steps[zoom_i:], 'covariance', 'C2'),
-        ]
-        # raw traces
-        ax.plot(steps[zoom_i:], loss_inv[zoom_i:], color='C0', alpha=alpha_r, linewidth=0.5)
-        ax.plot(steps[zoom_i:], loss_var[zoom_i:], color='C1', alpha=alpha_r, linewidth=0.5)
-        ax.plot(steps[zoom_i:], loss_cov[zoom_i:], color='C2', alpha=alpha_r, linewidth=0.5)
-        for vals, st, lbl, col in components:
-            ax.plot(st, vals, color=col, linewidth=1.5, label=lbl)
-        # clip y to smoothed range
-        all_comp = np.concatenate([loss_inv_s[zoom_i:], loss_var_s[zoom_i:], loss_cov_s[zoom_i:]])
-        lo2, hi2 = np.nanpercentile(all_comp, 1), np.nanpercentile(all_comp, 99)
-        pad2 = (hi2 - lo2) * 0.15
-        ax.set_ylim(lo2 - pad2, hi2 + pad2)
-        ax.set_xlabel('iteration')
-        ax.set_ylabel('component loss')
-        ax.set_title(f'Last {int(zoom_frac*100)}% — VICReg components (smoothed)')
-        ax.legend(fontsize=8, loc='upper right')
-        ax.grid(axis='y', linestyle=':', alpha=0.5)
+        # ── Row 2: each component on its own subplot / y-axis ─────────────
+        def _comp_subplot(ax, raw, smoothed, label, color):
+            ax.plot(zs, raw[zoom_i:],      color=color, alpha=alpha_r, linewidth=0.5)
+            ax.plot(zs, smoothed[zoom_i:], color=color, linewidth=1.8)
+            lo, hi = np.nanpercentile(smoothed[zoom_i:], 1), np.nanpercentile(smoothed[zoom_i:], 99)
+            pad = max((hi - lo) * 0.20, 1e-6)
+            ax.set_ylim(lo - pad, hi + pad)
+            ax.set_title(label, fontsize=10)
+            ax.set_xlabel('iteration')
+            ax.grid(axis='y', linestyle=':', alpha=0.5)
+
+        _comp_subplot(ax_inv, loss_inv, loss_inv_s, f'invariance  (last {int(zoom_frac*100)}%)', 'C0')
+        _comp_subplot(ax_var, loss_var, loss_var_s, f'variance    (last {int(zoom_frac*100)}%)', 'C1')
+        _comp_subplot(ax_cov, loss_cov, loss_cov_s, f'covariance  (last {int(zoom_frac*100)}%)', 'C2')
+        ax_inv.set_ylabel('loss')
 
         out = os.path.join(work_dir, 'loss_curve.png')
         plt.savefig(out, dpi=150, bbox_inches='tight')
