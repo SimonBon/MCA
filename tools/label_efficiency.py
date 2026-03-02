@@ -6,7 +6,7 @@ Loads pre-extracted features from train_results.npz / val_results.npz
 budgets, and saves results as JSON + PNG.
 
 Two sampling modes (combinable):
-  --fractions   fraction of each class, e.g. 0.01 0.05 0.1 0.25 0.5 1.0
+  --fractions   fraction of each class in (0, 1], e.g. 0.01 0.05 0.1 0.25 0.5 1.0
   --n_per_class fixed number of cells per class, e.g. 5 10 50 100
 
 Sampling is always per-class. For fractions, max(1, round(n_class * f))
@@ -14,14 +14,21 @@ cells are drawn so rare classes always get at least one sample.
 For n_per_class, min(n, n_class) cells are drawn.
 
 Usage:
+    # fractions only (default)
     python tools/label_efficiency.py z_RUNS/CODEX_cHL_CIM_VICReg_KRONOS18
+
+    # n_per_class only
     python tools/label_efficiency.py z_RUNS/CODEX_cHL_CIM_VICReg_KRONOS18 \\
-        --fractions 0.01 0.05 0.1 0.25 0.5 1.0 --n_per_class 5 10 50 100 \\
-        --n_repeats 3 --n_jobs 8
+        --n_per_class 5 10 50 100
+
+    # both combined
+    python tools/label_efficiency.py z_RUNS/CODEX_cHL_CIM_VICReg_KRONOS18 \\
+        --fractions 0.01 0.1 0.5 1.0 --n_per_class 5 10 50 100 --n_repeats 3
 """
 import argparse
 import json
 import os
+import sys
 
 import numpy as np
 import matplotlib
@@ -81,40 +88,30 @@ def _lp_metrics(train_feats, train_labels, val_feats, val_labels,
     return bal_acc, mean_ap
 
 
-def _evaluate_point(key, label, sample_fn, use_full,
-                    train_feats, train_labels, val_feats, val_labels,
-                    n_classes, n_repeats, epochs, n_jobs):
+def _run_point(label, sample_fn, train_feats, train_labels, val_feats, val_labels,
+               n_classes, n_repeats, epochs, n_jobs):
     """Run n_repeats LP evaluations for one budget point. Returns result dict."""
-    bal_accs, mean_aps = [], []
+    bal_accs, mean_aps, n_labeled_list = [], [], []
 
-    if use_full:
-        ba, ap = _lp_metrics(train_feats, train_labels, val_feats, val_labels,
-                              n_classes, epochs, n_jobs)
+    for rep in range(n_repeats):
+        rng = np.random.default_rng(seed=42 + rep)
+        idx = sample_fn(rng)
+        ba, ap = _lp_metrics(
+            train_feats[idx], train_labels[idx],
+            val_feats, val_labels,
+            n_classes, epochs, n_jobs,
+        )
         bal_accs.append(ba)
         mean_aps.append(ap)
-        n_labeled = len(train_feats)
-        print(f"    bal_acc={ba:.4f}  mean_ap={ap:.4f}")
-    else:
-        for rep in range(n_repeats):
-            rng = np.random.default_rng(seed=42 + rep)
-            idx = sample_fn(rng)
-            ba, ap = _lp_metrics(
-                train_feats[idx], train_labels[idx],
-                val_feats, val_labels,
-                n_classes, epochs, n_jobs,
-            )
-            bal_accs.append(ba)
-            mean_aps.append(ap)
-            print(f"    rep {rep+1} (n={len(idx)}): bal_acc={ba:.4f}  mean_ap={ap:.4f}")
-        n_labeled = len(sample_fn(np.random.default_rng(seed=42)))
+        n_labeled_list.append(len(idx))
+        print(f"    rep {rep+1} (n={len(idx)}): bal_acc={ba:.4f}  mean_ap={ap:.4f}")
 
     print(f"    => bal_acc {np.mean(bal_accs):.4f}±{np.std(bal_accs):.4f}  "
           f"mean_ap {np.mean(mean_aps):.4f}±{np.std(mean_aps):.4f}")
 
     return {
-        'key':          key,
         'label':        label,
-        'n_labeled':    n_labeled,
+        'n_labeled':    int(np.mean(n_labeled_list)),
         'n_repeats':    len(bal_accs),
         'bal_acc_mean': float(np.mean(bal_accs)),
         'bal_acc_std':  float(np.std(bal_accs)),
@@ -137,6 +134,14 @@ def run(work_dir, fractions, n_per_class, n_repeats, epochs, n_jobs):
     if not os.path.exists(val_path):
         raise FileNotFoundError(f"Not found: {val_path}")
 
+    # validate fractions
+    bad = [f for f in fractions if not (0 < f <= 1.0)]
+    if bad:
+        print(f"ERROR: --fractions must be in (0, 1]. Invalid values: {bad}\n"
+              f"       To use a fixed count per class use --n_per_class instead.",
+              file=sys.stderr)
+        sys.exit(1)
+
     print(f"Loading features from {work_dir} ...")
     train_npz = np.load(train_path, allow_pickle=True)
     val_npz   = np.load(val_path,   allow_pickle=True)
@@ -157,16 +162,16 @@ def run(work_dir, fractions, n_per_class, n_repeats, epochs, n_jobs):
 
     # ── Fraction-based points ─────────────────────────────────────────────────
     for frac in sorted(set(fractions)):
-        use_full = frac >= 1.0
         label    = f"{frac*100:.0f}%"
-        print(f"\n  [{label}] per-class fraction, {n_repeats} repeat(s):")
-        result = _evaluate_point(
-            key=f"frac_{frac}", label=label,
+        # frac=1.0 → deterministic, only 1 repeat needed
+        reps = 1 if frac >= 1.0 else n_repeats
+        print(f"\n  [{label}] per-class fraction, {reps} repeat(s):")
+        result = _run_point(
+            label=label,
             sample_fn=lambda rng, f=frac: _sample_by_fraction(train_labels, f, n_classes, rng),
-            use_full=use_full,
             train_feats=train_feats, train_labels=train_labels,
             val_feats=val_feats,     val_labels=val_labels,
-            n_classes=n_classes, n_repeats=n_repeats, epochs=epochs, n_jobs=n_jobs,
+            n_classes=n_classes, n_repeats=reps, epochs=epochs, n_jobs=n_jobs,
         )
         points.append(result)
 
@@ -174,10 +179,9 @@ def run(work_dir, fractions, n_per_class, n_repeats, epochs, n_jobs):
     for n in sorted(set(n_per_class)):
         label = f"{n}/cls"
         print(f"\n  [{label}] fixed {n} cells per class, {n_repeats} repeat(s):")
-        result = _evaluate_point(
-            key=f"n_{n}", label=label,
+        result = _run_point(
+            label=label,
             sample_fn=lambda rng, n_=n: _sample_by_n(train_labels, n_, n_classes, rng),
-            use_full=False,
             train_feats=train_feats, train_labels=train_labels,
             val_feats=val_feats,     val_labels=val_labels,
             n_classes=n_classes, n_repeats=n_repeats, epochs=epochs, n_jobs=n_jobs,
@@ -208,9 +212,8 @@ def run(work_dir, fractions, n_per_class, n_repeats, epochs, n_jobs):
     ap_s = np.array([p['mean_ap_std']  for p in points])
     lbls = [p['label'] for p in points]
 
-    # separate markers for fraction vs n_per_class points
-    frac_keys  = {p['key'] for p in points if p['key'].startswith('frac_')}
-    markers    = ['o' if p['key'] in frac_keys else 's' for p in points]
+    # squares for n/cls points, circles for fraction points
+    markers = ['s' if p['label'].endswith('/cls') else 'o' for p in points]
 
     title = os.path.basename(os.path.normpath(work_dir))
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
@@ -220,11 +223,10 @@ def run(work_dir, fractions, n_per_class, n_repeats, epochs, n_jobs):
         (ax1, ba_m, ba_s, 'Balanced Accuracy (val)', 'steelblue'),
         (ax2, ap_m, ap_s, 'Mean Average Precision (val)', 'darkorange'),
     ]:
-        # draw line through all points, then overlay per-point markers
         ax.plot(x, means, '-', color=color, linewidth=1.5, zorder=1)
         for xi, yi, si, mk in zip(x, means, stds, markers):
             ax.plot(xi, yi, mk, color=color, markersize=7, zorder=2)
-            if n_repeats > 1:
+            if si > 0:
                 ax.errorbar(xi, yi, yerr=si, fmt='none', color=color,
                             capsize=3, linewidth=1, zorder=2)
         ax.set_xscale('log')
@@ -235,13 +237,11 @@ def run(work_dir, fractions, n_per_class, n_repeats, epochs, n_jobs):
             ax.annotate(lbl, xy=(xi, yi), xytext=(0, 8),
                         textcoords='offset points', ha='center', fontsize=8)
 
-    # legend for marker shapes
     from matplotlib.lines import Line2D
-    legend_elements = [
+    ax2.legend(handles=[
         Line2D([0], [0], marker='o', color='grey', linestyle='none', markersize=7, label='fraction'),
         Line2D([0], [0], marker='s', color='grey', linestyle='none', markersize=7, label='n/class'),
-    ]
-    ax2.legend(handles=legend_elements, fontsize=8, loc='lower right')
+    ], fontsize=8, loc='lower right')
 
     plt.tight_layout()
     out_png = os.path.join(work_dir, 'label_efficiency.png')
@@ -254,16 +254,33 @@ def run(work_dir, fractions, n_per_class, n_repeats, epochs, n_jobs):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Label efficiency evaluation from saved feature NPZs.')
+        description='Label efficiency evaluation from saved feature NPZs.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+examples:
+  # fractions only (default: 1%,5%,10%,25%,50%,100% per class)
+  python tools/label_efficiency.py z_RUNS/CODEX_cHL_CIM_VICReg_KRONOS18
+
+  # fixed count per class only
+  python tools/label_efficiency.py z_RUNS/CODEX_cHL_CIM_VICReg_KRONOS18 \\
+      --n_per_class 5 10 50 100
+
+  # both combined
+  python tools/label_efficiency.py z_RUNS/CODEX_cHL_CIM_VICReg_KRONOS18 \\
+      --fractions 0.01 0.1 0.5 1.0 --n_per_class 5 10 50 100
+""")
     parser.add_argument('work_dir',
                         help='Path to z_RUNS/<run> directory containing '
                              'train_results.npz and val_results.npz')
     parser.add_argument('--fractions', nargs='+', type=float,
                         default=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0],
-                        help='Per-class label fractions (default: 0.01 0.05 0.1 0.25 0.5 1.0)')
+                        metavar='F',
+                        help='Per-class label fractions in (0,1] '
+                             '(default: 0.01 0.05 0.1 0.25 0.5 1.0)')
     parser.add_argument('--n_per_class', nargs='+', type=int,
                         default=[],
-                        help='Fixed cells per class, e.g. --n_per_class 5 10 50 100')
+                        metavar='N',
+                        help='Fixed cells per class, e.g. 5 10 50 100')
     parser.add_argument('--n_repeats', type=int, default=3,
                         help='Repeats per point with different random seeds (default: 3)')
     parser.add_argument('--epochs', type=int, default=2000,
