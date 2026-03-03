@@ -114,8 +114,8 @@ def plot_loss(work_dir, smooth_window=50, zoom_frac=0.5):
     _comp_subplot(ax_cov, loss_cov, loss_cov_s, f'covariance  (last {int(zoom_frac*100)}%)', 'C2')
     ax_inv.set_ylabel('loss')
 
-    out = os.path.join(work_dir, 'loss_curve.png')
-    plt.savefig(out, dpi=150, bbox_inches='tight')
+    out = os.path.join(work_dir, 'loss_curve.pdf')
+    plt.savefig(out, bbox_inches='tight')
     plt.close()
     print(f"Saved: {out}")
 

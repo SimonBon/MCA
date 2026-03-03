@@ -394,9 +394,9 @@ class EvaluateModelRich(Hook):
                    markersize=7, label='n/class'),
         ], fontsize=8, loc='lower right')
         plt.tight_layout()
-        plt.savefig(os.path.join(work_dir, 'label_efficiency.png'), dpi=150, bbox_inches='tight')
+        plt.savefig(os.path.join(work_dir, 'label_efficiency.pdf'), bbox_inches='tight')
         plt.close()
-        print(f"  Saved label_efficiency.json + label_efficiency.png to {work_dir}")
+        print(f"  Saved label_efficiency.json + label_efficiency.pdf to {work_dir}")
 
     # ──────────────────────────────────────────────────────────────────────
     # Main evaluation
@@ -578,7 +578,7 @@ class EvaluateModelRich(Hook):
             ax=ax, cmap='Blues', values_format='.2f', xticks_rotation=45)
         ax.set_title('Confusion Matrix — Linear Probe (Val)')
         plt.tight_layout()
-        plt.savefig(f'{work_dir}/confusion_matrix.png', dpi=150, bbox_inches='tight')
+        plt.savefig(f'{work_dir}/confusion_matrix.pdf', bbox_inches='tight')
         plt.close()
 
         def _cm_to_dict(cm, cls_list):
@@ -620,9 +620,9 @@ class EvaluateModelRich(Hook):
             ax.set_ylabel('UMAP 2')
             ax.set_title('Val features — UMAP (coloured by cell type)')
             plt.tight_layout()
-            plt.savefig(f'{work_dir}/umap.png', dpi=150, bbox_inches='tight')
+            plt.savefig(f'{work_dir}/umap.pdf', bbox_inches='tight')
             plt.close()
-            print(f"Saved UMAP to {work_dir}/umap.png")
+            print(f"Saved UMAP to {work_dir}/umap.pdf")
 
             # UMAP coloured by sample ID
             unique_ids = np.unique(val_ids)
@@ -642,9 +642,9 @@ class EvaluateModelRich(Hook):
             ax2.set_ylabel('UMAP 2')
             ax2.set_title('Val features — UMAP (coloured by sample ID)')
             plt.tight_layout()
-            plt.savefig(f'{work_dir}/umap_sample.png', dpi=150, bbox_inches='tight')
+            plt.savefig(f'{work_dir}/umap_sample.pdf', bbox_inches='tight')
             plt.close()
-            print(f"Saved sample UMAP to {work_dir}/umap_sample.png")
+            print(f"Saved sample UMAP to {work_dir}/umap_sample.pdf")
 
             np.savez_compressed(f'{work_dir}/umap_embeddings.npz',
                                 embedding=val_emb,

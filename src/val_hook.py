@@ -214,8 +214,8 @@ class EvaluateModel(Hook):
         axes[1].set_title('Validation Confusion Matrix')
         
         plt.tight_layout()
-        plt.savefig(f'{runner.work_dir}/confusion_matrix.png', dpi=150, bbox_inches='tight')
-        print(f"\nSaved confusion matrix to {runner.work_dir}/confusion_matrix.png")
+        plt.savefig(f'{runner.work_dir}/confusion_matrix.pdf', bbox_inches='tight')
+        print(f"\nSaved confusion matrix to {runner.work_dir}/confusion_matrix.pdf")
 
         # ============================================
         # SAVE CONFUSION MATRICES AS JSON

@@ -244,10 +244,10 @@ def run(work_dir, fractions, n_per_class, n_repeats, epochs, n_jobs):
     ], fontsize=8, loc='lower right')
 
     plt.tight_layout()
-    out_png = os.path.join(work_dir, 'label_efficiency.png')
-    plt.savefig(out_png, dpi=150, bbox_inches='tight')
+    out_pdf = os.path.join(work_dir, 'label_efficiency.pdf')
+    plt.savefig(out_pdf, bbox_inches='tight')
     plt.close()
-    print(f"Saved: {out_png}")
+    print(f"Saved: {out_pdf}")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
