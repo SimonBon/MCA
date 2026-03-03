@@ -72,7 +72,7 @@ def _lp_metrics(train_feats, train_labels, val_feats, val_labels,
     """Fit LP and return (bal_acc, mean_ap)."""
     clf = LogisticRegression(
         solver='lbfgs', penalty='l2', max_iter=epochs,
-        class_weight='balanced', C=10, n_jobs=n_jobs,
+        class_weight='balanced', C=1, n_jobs=n_jobs,
     )
     clf.fit(train_feats, train_labels)
     val_pred  = clf.predict(val_feats)

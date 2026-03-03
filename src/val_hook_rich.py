@@ -281,7 +281,7 @@ class EvaluateModelRich(Hook):
             idx = sample_fn(rng)
             clf = LogisticRegression(
                 solver='lbfgs', penalty='l2', max_iter=epochs,
-                class_weight='balanced', C=10, n_jobs=n_jobs,
+                class_weight='balanced', C=1, n_jobs=n_jobs,
             )
             clf.fit(train_feats[idx], train_labels[idx])
             val_pred  = clf.predict(val_feats)
@@ -430,7 +430,7 @@ class EvaluateModelRich(Hook):
         print("\n=== 1. Linear Probe ===")
         clf = LogisticRegression(
             solver='lbfgs', penalty='l2', max_iter=self.epochs,
-            class_weight='balanced', C=10, n_jobs=self.n_jobs, verbose=1,
+            class_weight='balanced', C=1, n_jobs=self.n_jobs, verbose=1,
         )
         clf.fit(train_feats, train_labels)
 
