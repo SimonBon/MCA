@@ -60,7 +60,7 @@ class EvaluateModelRich(Hook):
             silhouette_max_samples=10_000,
             n_jobs=4,
             le_fractions=(0.01, 0.1),
-            le_n_per_class=(10, 100, 500),
+            le_n_per_class=(10, 50, 100, 200, 1000),
             le_n_repeats=3):
 
         super().__init__()
