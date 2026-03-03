@@ -312,7 +312,8 @@ class EvaluateModelRich(Hook):
     @staticmethod
     def _label_efficiency(train_feats, train_labels, val_feats, val_labels,
                           classes, n_classes, work_dir,
-                          fractions, n_per_class, n_repeats, epochs, n_jobs):
+                          fractions, n_per_class, n_repeats, epochs, n_jobs,
+                          full_lp_point=None):
         import os
         from matplotlib.lines import Line2D
 
@@ -345,6 +346,9 @@ class EvaluateModelRich(Hook):
                 n_classes=n_classes, n_repeats=n_repeats, epochs=epochs, n_jobs=n_jobs,
             )
             points.append(p)
+
+        if full_lp_point is not None:
+            points.append(full_lp_point)
 
         points.sort(key=lambda p: p['n_labeled'])
 
@@ -680,6 +684,18 @@ class EvaluateModelRich(Hook):
         self._plot_loss_curve(work_dir)
 
         # ── Label efficiency ──────────────────────────────────────────────
+        lp_val = metrics['linear_probe']['val']
+        full_lp_point = {
+            'label':        '100%',
+            'n_labeled':    len(train_labels),
+            'n_repeats':    1,
+            'bal_acc_mean': lp_val['top1_balanced_accuracy'],
+            'bal_acc_std':  0.0,
+            'mean_ap_mean': lp_val.get('mean_average_precision', float('nan')),
+            'mean_ap_std':  0.0,
+            'bal_acc_runs': [lp_val['top1_balanced_accuracy']],
+            'mean_ap_runs': [lp_val.get('mean_average_precision', float('nan'))],
+        }
         self._label_efficiency(
             train_feats=train_feats, train_labels=train_labels,
             val_feats=val_feats,     val_labels=val_labels,
@@ -690,6 +706,7 @@ class EvaluateModelRich(Hook):
             n_repeats=self.le_n_repeats,
             epochs=self.epochs,
             n_jobs=self.n_jobs,
+            full_lp_point=full_lp_point,
         )
 
         # ── Summary print ──────────────────────────────────────────────────
