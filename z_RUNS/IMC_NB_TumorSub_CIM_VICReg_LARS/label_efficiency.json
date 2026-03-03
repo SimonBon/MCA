@@ -1,0 +1,137 @@
+{
+  "classes": [
+    "B_Cell",
+    "CD4_T",
+    "CD8_T",
+    "Myeloid",
+    "Neutrophil",
+    "Progenitor",
+    "Proliferating",
+    "Stromal",
+    "TC_CD24neg",
+    "TC_CD24pos",
+    "TC_CD44",
+    "TC_CHGAhi",
+    "TC_CXCR4hi",
+    "TC_GATA3hi",
+    "TC_GD2lo",
+    "TC_bridge",
+    "TC_early",
+    "T_Cell"
+  ],
+  "n_classes": 18,
+  "epochs": 2000,
+  "n_repeats": 3,
+  "points": [
+    {
+      "label": "10/cls",
+      "n_labeled": 180,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.5846661034554395,
+      "bal_acc_std": 0.004346683950254885,
+      "mean_ap_mean": 0.5211610063134374,
+      "mean_ap_std": 0.008554711428881187,
+      "bal_acc_runs": [
+        0.58597,
+        0.58922,
+        0.57881
+      ],
+      "mean_ap_runs": [
+        0.51942,
+        0.5324,
+        0.51166
+      ]
+    },
+    {
+      "label": "100/cls",
+      "n_labeled": 1800,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.696130085767337,
+      "bal_acc_std": 0.005286489151155658,
+      "mean_ap_mean": 0.6334227941899975,
+      "mean_ap_std": 0.009808696779260724,
+      "bal_acc_runs": [
+        0.69736,
+        0.68913,
+        0.7019
+      ],
+      "mean_ap_runs": [
+        0.6433,
+        0.62005,
+        0.63692
+      ]
+    },
+    {
+      "label": "1%",
+      "n_labeled": 2072,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.6199758402382162,
+      "bal_acc_std": 0.004075712213254883,
+      "mean_ap_mean": 0.6338186862859257,
+      "mean_ap_std": 0.017282827124028777,
+      "bal_acc_runs": [
+        0.62514,
+        0.61518,
+        0.6196
+      ],
+      "mean_ap_runs": [
+        0.65026,
+        0.60993,
+        0.64126
+      ]
+    },
+    {
+      "label": "500/cls",
+      "n_labeled": 8978,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.7484518912482505,
+      "bal_acc_std": 0.0036236227500659173,
+      "mean_ap_mean": 0.7056946281768566,
+      "mean_ap_std": 0.0067498985515326015,
+      "bal_acc_runs": [
+        0.7533,
+        0.74747,
+        0.74459
+      ],
+      "mean_ap_runs": [
+        0.71286,
+        0.70758,
+        0.69665
+      ]
+    },
+    {
+      "label": "10%",
+      "n_labeled": 20724,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.7176521633542579,
+      "bal_acc_std": 0.0010140437276868427,
+      "mean_ap_mean": 0.7222209385284556,
+      "mean_ap_std": 0.00337505587317327,
+      "bal_acc_runs": [
+        0.71797,
+        0.7187,
+        0.71628
+      ],
+      "mean_ap_runs": [
+        0.72023,
+        0.72697,
+        0.71946
+      ]
+    },
+    {
+      "label": "100%",
+      "n_labeled": 207223,
+      "n_repeats": 1,
+      "bal_acc_mean": 0.771622202177996,
+      "bal_acc_std": 0.0,
+      "mean_ap_mean": 0.7679985957592351,
+      "mean_ap_std": 0.0,
+      "bal_acc_runs": [
+        0.77162
+      ],
+      "mean_ap_runs": [
+        0.768
+      ]
+    }
+  ]
+}

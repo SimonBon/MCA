@@ -59,7 +59,7 @@ class EvaluateModelRich(Hook):
             knn_k=15,
             silhouette_max_samples=10_000,
             n_jobs=4,
-            le_fractions=(0.01, 0.1),
+            le_fractions=(0.01, 0.1, 1.0),
             le_n_per_class=(10, 50, 100, 200, 1000),
             le_n_repeats=3):
 
