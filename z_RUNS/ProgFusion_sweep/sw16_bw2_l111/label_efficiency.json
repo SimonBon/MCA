@@ -1,0 +1,26 @@
+{
+  "classes": [
+    "B_Cell",
+    "CD4_T",
+    "CD8_T",
+    "Myeloid",
+    "Neutrophil",
+    "Progenitor",
+    "Proliferating",
+    "Stromal",
+    "TC_CD24neg",
+    "TC_CD24pos",
+    "TC_CD44",
+    "TC_CHGAhi",
+    "TC_CXCR4hi",
+    "TC_GATA3hi",
+    "TC_GD2lo",
+    "TC_bridge",
+    "TC_early",
+    "T_Cell"
+  ],
+  "n_classes": 18,
+  "epochs": 500,
+  "n_repeats": 3,
+  "points": []
+}

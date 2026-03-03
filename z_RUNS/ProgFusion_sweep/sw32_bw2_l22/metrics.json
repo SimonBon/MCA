@@ -1,0 +1,249 @@
+{
+  "classes": [
+    "B_Cell",
+    "CD4_T",
+    "CD8_T",
+    "Myeloid",
+    "Neutrophil",
+    "Progenitor",
+    "Proliferating",
+    "Stromal",
+    "TC_CD24neg",
+    "TC_CD24pos",
+    "TC_CD44",
+    "TC_CHGAhi",
+    "TC_CXCR4hi",
+    "TC_GATA3hi",
+    "TC_GD2lo",
+    "TC_bridge",
+    "TC_early",
+    "T_Cell"
+  ],
+  "n_classes": 18,
+  "feature_dim": 992,
+  "linear_probe": {
+    "train": {
+      "top1_accuracy": 0.8652052238805971,
+      "top2_accuracy": 0.9638192963752665,
+      "top1_balanced_accuracy": 0.9290736933556969,
+      "top2_balanced_accuracy": 0.9820469678692292,
+      "precision": 0.8689712209004078,
+      "f1": 0.865335989813047,
+      "n_samples": 15008
+    },
+    "val": {
+      "top1_accuracy": 0.7422707889125799,
+      "top2_accuracy": 0.9143123667377399,
+      "top1_balanced_accuracy": 0.7003064098587597,
+      "top2_balanced_accuracy": 0.8564379644395771,
+      "precision": 0.7502913717927422,
+      "f1": 0.7447027331406232,
+      "n_samples": 15008,
+      "mean_average_precision": 0.7282836591204781,
+      "per_class_ap": {
+        "B_Cell": 0.9262,
+        "CD4_T": 0.7658,
+        "CD8_T": 0.7443,
+        "Myeloid": 0.7856,
+        "Neutrophil": 0.7493,
+        "Progenitor": 0.3132,
+        "Proliferating": 0.8735,
+        "Stromal": 0.9313,
+        "TC_CD24neg": 0.8057,
+        "TC_CD24pos": 0.5845,
+        "TC_CD44": 0.8584,
+        "TC_CHGAhi": 0.2358,
+        "TC_CXCR4hi": 0.7847,
+        "TC_GATA3hi": 0.4015,
+        "TC_GD2lo": 0.8442,
+        "TC_bridge": 0.7819,
+        "TC_early": 0.843,
+        "T_Cell": 0.88
+      }
+    }
+  },
+  "knn": {
+    "k": 15,
+    "val": {
+      "top1_accuracy": 0.7250799573560768,
+      "top1_balanced_accuracy": 0.5894169748007927,
+      "f1": 0.7174197668531064
+    }
+  },
+  "clustering": {
+    "method": "MiniBatchKMeans(k=18, n_init=10)",
+    "val": {
+      "nmi": 0.3951368319155075,
+      "ari": 0.23398757010611326
+    },
+    "all": {
+      "nmi": 0.39587899123264597,
+      "ari": 0.2370109343821748
+    }
+  },
+  "neighbourhood_purity": {
+    "k": 15,
+    "mean_purity": 0.6199626865671641,
+    "mean_lift": 21.46369393112888,
+    "per_class": {
+      "B_Cell": {
+        "purity": 0.7275024295432458,
+        "expected_chance": 0.0228544776119403,
+        "purity_lift": 31.83194303960651,
+        "n_cells": 343
+      },
+      "CD4_T": {
+        "purity": 0.32284644194756557,
+        "expected_chance": 0.005930170575692964,
+        "purity_lift": 54.44134158145015,
+        "n_cells": 89
+      },
+      "CD8_T": {
+        "purity": 0.5620567375886525,
+        "expected_chance": 0.012526652452025586,
+        "purity_lift": 44.86886977516222,
+        "n_cells": 188
+      },
+      "Myeloid": {
+        "purity": 0.5666666666666667,
+        "expected_chance": 0.027185501066098083,
+        "purity_lift": 20.84444444444444,
+        "n_cells": 408
+      },
+      "Neutrophil": {
+        "purity": 0.5162303664921466,
+        "expected_chance": 0.012726545842217484,
+        "purity_lift": 40.563274033058306,
+        "n_cells": 191
+      },
+      "Progenitor": {
+        "purity": 0.15483870967741936,
+        "expected_chance": 0.006196695095948827,
+        "purity_lift": 24.987304890738816,
+        "n_cells": 93
+      },
+      "Proliferating": {
+        "purity": 0.6908615136876006,
+        "expected_chance": 0.11034115138592751,
+        "purity_lift": 6.2611410612460805,
+        "n_cells": 1656
+      },
+      "Stromal": {
+        "purity": 0.8130605285592498,
+        "expected_chance": 0.1302638592750533,
+        "purity_lift": 6.241643177809321,
+        "n_cells": 1955
+      },
+      "TC_CD24neg": {
+        "purity": 0.6649377593360996,
+        "expected_chance": 0.06423240938166311,
+        "purity_lift": 10.35206005406243,
+        "n_cells": 964
+      },
+      "TC_CD24pos": {
+        "purity": 0.3645878136200717,
+        "expected_chance": 0.06196695095948827,
+        "purity_lift": 5.883584846032297,
+        "n_cells": 930
+      },
+      "TC_CD44": {
+        "purity": 0.6542840023966447,
+        "expected_chance": 0.11120735607675906,
+        "purity_lift": 5.883459741143706,
+        "n_cells": 1669
+      },
+      "TC_CHGAhi": {
+        "purity": 0.08222222222222222,
+        "expected_chance": 0.0019989339019189766,
+        "purity_lift": 41.133037037037035,
+        "n_cells": 30
+      },
+      "TC_CXCR4hi": {
+        "purity": 0.5344771241830065,
+        "expected_chance": 0.10874200426439233,
+        "purity_lift": 4.915093553761373,
+        "n_cells": 1632
+      },
+      "TC_GATA3hi": {
+        "purity": 0.1175925925925926,
+        "expected_chance": 0.004797441364605544,
+        "purity_lift": 24.511522633744853,
+        "n_cells": 72
+      },
+      "TC_GD2lo": {
+        "purity": 0.6854961832061068,
+        "expected_chance": 0.01745735607675906,
+        "purity_lift": 39.26689586853913,
+        "n_cells": 262
+      },
+      "TC_bridge": {
+        "purity": 0.5551437013161429,
+        "expected_chance": 0.08268923240938167,
+        "purity_lift": 6.713615366118188,
+        "n_cells": 1241
+      },
+      "TC_early": {
+        "purity": 0.5696945337620579,
+        "expected_chance": 0.1657782515991471,
+        "purity_lift": 3.4364853547833465,
+        "n_cells": 2488
+      },
+      "T_Cell": {
+        "purity": 0.7546633207862818,
+        "expected_chance": 0.05310501066098081,
+        "purity_lift": 14.210774301581578,
+        "n_cells": 797
+      }
+    }
+  },
+  "silhouette": {
+    "score": 0.04274114593863487,
+    "n_samples": 10000,
+    "metric": "cosine"
+  },
+  "umap": {
+    "saved": true,
+    "n_neighbors": 15,
+    "min_dist": 0.1,
+    "metric": "cosine"
+  },
+  "train": {
+    "top1_accuracy": 0.8652052238805971,
+    "top2_accuracy": 0.9638192963752665,
+    "top1_balanced_accuracy": 0.9290736933556969,
+    "top2_balanced_accuracy": 0.9820469678692292,
+    "precision": 0.8689712209004078,
+    "f1": 0.865335989813047,
+    "n_samples": 15008
+  },
+  "val": {
+    "top1_accuracy": 0.7422707889125799,
+    "top2_accuracy": 0.9143123667377399,
+    "top1_balanced_accuracy": 0.7003064098587597,
+    "top2_balanced_accuracy": 0.8564379644395771,
+    "precision": 0.7502913717927422,
+    "f1": 0.7447027331406232,
+    "n_samples": 15008,
+    "mean_average_precision": 0.7282836591204781,
+    "per_class_ap": {
+      "B_Cell": 0.9262,
+      "CD4_T": 0.7658,
+      "CD8_T": 0.7443,
+      "Myeloid": 0.7856,
+      "Neutrophil": 0.7493,
+      "Progenitor": 0.3132,
+      "Proliferating": 0.8735,
+      "Stromal": 0.9313,
+      "TC_CD24neg": 0.8057,
+      "TC_CD24pos": 0.5845,
+      "TC_CD44": 0.8584,
+      "TC_CHGAhi": 0.2358,
+      "TC_CXCR4hi": 0.7847,
+      "TC_GATA3hi": 0.4015,
+      "TC_GD2lo": 0.8442,
+      "TC_bridge": 0.7819,
+      "TC_early": 0.843,
+      "T_Cell": 0.88
+    }
+  }
+}
