@@ -9,7 +9,7 @@
 #   bash run_paper.sh 0 &            # run in background on GPU 0
 #
 # Models : CIM | CIM_ProgFusion | EarlyFusion32 | ResNet
-# Datasets: CODEX_cHL_KRONOS18 | CODEX_DLBCL | IMC_NB_TumorSub | MIBI_TNBC
+# Datasets: CODEX_cHL_KRONOS18 | CODEX_cHL | CODEX_DLBCL | IMC_NB_TumorSub | MIBI_TNBC
 
 set -e
 
@@ -60,6 +60,12 @@ run $CONFIGS/CODEX_cHL_KRONOS18/CIM_VICReg_LARS.py
 run $CONFIGS/CODEX_cHL_KRONOS18/CIM_ProgFusion_VICReg_LARS.py
 run $CONFIGS/CODEX_cHL_KRONOS18/EarlyFusion32_VICReg_LARS.py
 run $CONFIGS/CODEX_cHL_KRONOS18/ResNet_VICReg_LARS.py
+
+# ── CODEX_cHL (full 41-marker panel) ─────────────────────────────────────────
+run $CONFIGS/CODEX_cHL/CIM_VICReg_LARS.py
+run $CONFIGS/CODEX_cHL/CIM_ProgFusion_VICReg_LARS.py
+run $CONFIGS/CODEX_cHL/EarlyFusion32_VICReg_LARS.py
+run $CONFIGS/CODEX_cHL/ResNet_VICReg_LARS.py
 
 # ── CODEX_DLBCL ───────────────────────────────────────────────────────────────
 run $CONFIGS/CODEX_DLBCL/CIM_VICReg_LARS.py
