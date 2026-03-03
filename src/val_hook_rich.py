@@ -58,7 +58,10 @@ class EvaluateModelRich(Hook):
             max_samples=None,
             knn_k=15,
             silhouette_max_samples=10_000,
-            n_jobs=4):
+            n_jobs=4,
+            le_fractions=(0.01, 0.1, 1.0),
+            le_n_per_class=(10, 100, 500),
+            le_n_repeats=3):
 
         super().__init__()
 
@@ -70,6 +73,9 @@ class EvaluateModelRich(Hook):
         self.knn_k = knn_k
         self.silhouette_max_samples = silhouette_max_samples
         self.n_jobs = n_jobs
+        self.le_fractions   = list(le_fractions)
+        self.le_n_per_class = list(le_n_per_class)
+        self.le_n_repeats   = le_n_repeats
 
         base_dataset = dict(type='MCIDataset', pipeline=pipeline)
         base_dataset.update(dataset_kwargs)
@@ -240,6 +246,153 @@ class EvaluateModelRich(Hook):
         plt.savefig(out, dpi=150, bbox_inches='tight')
         plt.close()
         print(f"  Saved loss curve to {out}")
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Label efficiency
+    # ──────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _le_sample_by_fraction(train_labels, frac, n_classes, rng):
+        indices = []
+        for c in range(n_classes):
+            idx = np.where(train_labels == c)[0]
+            if len(idx) == 0:
+                continue
+            n_take = min(max(1, int(round(len(idx) * frac))), len(idx))
+            indices.append(rng.choice(idx, n_take, replace=False))
+        return np.concatenate(indices)
+
+    @staticmethod
+    def _le_sample_by_n(train_labels, n, n_classes, rng):
+        indices = []
+        for c in range(n_classes):
+            idx = np.where(train_labels == c)[0]
+            if len(idx) == 0:
+                continue
+            indices.append(rng.choice(idx, min(n, len(idx)), replace=False))
+        return np.concatenate(indices)
+
+    @staticmethod
+    def _le_run_point(label, sample_fn, train_feats, train_labels,
+                      val_feats, val_labels, n_classes, n_repeats, epochs, n_jobs):
+        bal_accs, mean_aps, ns = [], [], []
+        for rep in range(n_repeats):
+            rng = np.random.default_rng(seed=42 + rep)
+            idx = sample_fn(rng)
+            clf = LogisticRegression(
+                solver='lbfgs', penalty='l2', max_iter=epochs,
+                class_weight='balanced', C=10, n_jobs=n_jobs,
+            )
+            clf.fit(train_feats[idx], train_labels[idx])
+            val_pred  = clf.predict(val_feats)
+            val_proba = clf.predict_proba(val_feats)
+            ba = float(balanced_accuracy_score(val_labels, val_pred))
+            val_bin = label_binarize(val_labels, classes=list(range(n_classes)))
+            if val_bin.shape[1] == 1:
+                val_bin = np.hstack([1 - val_bin, val_bin])
+            ap = float(np.mean(average_precision_score(val_bin, val_proba, average=None)))
+            bal_accs.append(ba)
+            mean_aps.append(ap)
+            ns.append(len(idx))
+            print(f"    rep {rep+1} (n={len(idx)}): bal_acc={ba:.4f}  mean_ap={ap:.4f}")
+        print(f"    => bal_acc {np.mean(bal_accs):.4f}±{np.std(bal_accs):.4f}  "
+              f"mean_ap {np.mean(mean_aps):.4f}±{np.std(mean_aps):.4f}")
+        return {
+            'label':        label,
+            'n_labeled':    int(np.mean(ns)),
+            'n_repeats':    len(bal_accs),
+            'bal_acc_mean': float(np.mean(bal_accs)),
+            'bal_acc_std':  float(np.std(bal_accs)),
+            'mean_ap_mean': float(np.mean(mean_aps)),
+            'mean_ap_std':  float(np.std(mean_aps)),
+            'bal_acc_runs': [round(v, 5) for v in bal_accs],
+            'mean_ap_runs': [round(v, 5) for v in mean_aps],
+        }
+
+    @staticmethod
+    def _label_efficiency(train_feats, train_labels, val_feats, val_labels,
+                          classes, n_classes, work_dir,
+                          fractions, n_per_class, n_repeats, epochs, n_jobs):
+        import os
+        from matplotlib.lines import Line2D
+
+        print("\n=== 8. Label Efficiency ===")
+        points = []
+
+        for frac in sorted(set(fractions)):
+            reps  = 1 if frac >= 1.0 else n_repeats
+            label = f"{frac*100:.0f}%"
+            print(f"\n  [{label}] per-class fraction, {reps} repeat(s):")
+            p = EvaluateModelRich._le_run_point(
+                label=label,
+                sample_fn=lambda rng, f=frac: EvaluateModelRich._le_sample_by_fraction(
+                    train_labels, f, n_classes, rng),
+                train_feats=train_feats, train_labels=train_labels,
+                val_feats=val_feats,     val_labels=val_labels,
+                n_classes=n_classes, n_repeats=reps, epochs=epochs, n_jobs=n_jobs,
+            )
+            points.append(p)
+
+        for n in sorted(set(n_per_class)):
+            label = f"{n}/cls"
+            print(f"\n  [{label}] fixed {n} cells per class, {n_repeats} repeat(s):")
+            p = EvaluateModelRich._le_run_point(
+                label=label,
+                sample_fn=lambda rng, n_=n: EvaluateModelRich._le_sample_by_n(
+                    train_labels, n_, n_classes, rng),
+                train_feats=train_feats, train_labels=train_labels,
+                val_feats=val_feats,     val_labels=val_labels,
+                n_classes=n_classes, n_repeats=n_repeats, epochs=epochs, n_jobs=n_jobs,
+            )
+            points.append(p)
+
+        points.sort(key=lambda p: p['n_labeled'])
+
+        with open(os.path.join(work_dir, 'label_efficiency.json'), 'w') as f:
+            json.dump({
+                'classes': classes, 'n_classes': n_classes,
+                'epochs': epochs,   'n_repeats': n_repeats,
+                'points': points,
+            }, f, indent=2)
+
+        # plot
+        x    = np.array([p['n_labeled']    for p in points])
+        ba_m = np.array([p['bal_acc_mean'] for p in points])
+        ba_s = np.array([p['bal_acc_std']  for p in points])
+        ap_m = np.array([p['mean_ap_mean'] for p in points])
+        ap_s = np.array([p['mean_ap_std']  for p in points])
+        lbls    = [p['label'] for p in points]
+        markers = ['s' if p['label'].endswith('/cls') else 'o' for p in points]
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
+        fig.suptitle(f'Label Efficiency — {os.path.basename(work_dir)}', fontsize=12)
+        for ax, means, stds, ylabel, color in [
+            (ax1, ba_m, ba_s, 'Balanced Accuracy (val)', 'steelblue'),
+            (ax2, ap_m, ap_s, 'Mean Average Precision (val)', 'darkorange'),
+        ]:
+            ax.plot(x, means, '-', color=color, linewidth=1.5, zorder=1)
+            for xi, yi, si, mk in zip(x, means, stds, markers):
+                ax.plot(xi, yi, mk, color=color, markersize=7, zorder=2)
+                if si > 0:
+                    ax.errorbar(xi, yi, yerr=si, fmt='none', color=color,
+                                capsize=3, linewidth=1, zorder=2)
+            ax.set_xscale('log')
+            ax.set_xlabel('# labeled training cells')
+            ax.set_ylabel(ylabel)
+            ax.grid(True, which='both', linestyle=':', alpha=0.5)
+            for lbl, xi, yi in zip(lbls, x, means):
+                ax.annotate(lbl, xy=(xi, yi), xytext=(0, 8),
+                            textcoords='offset points', ha='center', fontsize=8)
+        ax2.legend(handles=[
+            Line2D([0], [0], marker='o', color='grey', linestyle='none',
+                   markersize=7, label='fraction'),
+            Line2D([0], [0], marker='s', color='grey', linestyle='none',
+                   markersize=7, label='n/class'),
+        ], fontsize=8, loc='lower right')
+        plt.tight_layout()
+        plt.savefig(os.path.join(work_dir, 'label_efficiency.png'), dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f"  Saved label_efficiency.json + label_efficiency.png to {work_dir}")
 
     # ──────────────────────────────────────────────────────────────────────
     # Main evaluation
@@ -525,6 +678,19 @@ class EvaluateModelRich(Hook):
 
         # ── Loss curve ────────────────────────────────────────────────────
         self._plot_loss_curve(work_dir)
+
+        # ── Label efficiency ──────────────────────────────────────────────
+        self._label_efficiency(
+            train_feats=train_feats, train_labels=train_labels,
+            val_feats=val_feats,     val_labels=val_labels,
+            classes=classes,         n_classes=n_classes,
+            work_dir=work_dir,
+            fractions=self.le_fractions,
+            n_per_class=self.le_n_per_class,
+            n_repeats=self.le_n_repeats,
+            epochs=self.epochs,
+            n_jobs=self.n_jobs,
+        )
 
         # ── Summary print ──────────────────────────────────────────────────
         lp  = metrics['linear_probe']['val']
