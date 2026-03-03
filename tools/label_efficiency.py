@@ -273,10 +273,10 @@ examples:
                         help='Path to z_RUNS/<run> directory containing '
                              'train_results.npz and val_results.npz')
     parser.add_argument('--fractions', nargs='+', type=float,
-                        default=[0.01, 0.05, 0.1, 0.25, 0.5],
+                        default=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0],
                         metavar='F',
                         help='Per-class label fractions in (0,1] '
-                             '(default: 0.01 0.05 0.1 0.25 0.5)')
+                             '(default: 0.01 0.05 0.1 0.25 0.5 1.0)')
     parser.add_argument('--n_per_class', nargs='+', type=int,
                         default=[],
                         metavar='N',
