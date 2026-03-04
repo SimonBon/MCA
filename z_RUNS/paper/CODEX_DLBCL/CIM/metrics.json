@@ -1,0 +1,249 @@
+{
+  "classes": [
+    "B",
+    "CD4T",
+    "CD4TNaive",
+    "DC",
+    "FDC",
+    "Granulo",
+    "MC",
+    "Macro",
+    "NK",
+    "NKT",
+    "PC",
+    "Stromal cells",
+    "TFH",
+    "TPR",
+    "TTOX",
+    "TTOXNaive",
+    "TTOX_exh",
+    "Treg"
+  ],
+  "n_classes": 18,
+  "feature_dim": 1280,
+  "linear_probe": {
+    "train": {
+      "top1_accuracy": 0.705892848809599,
+      "top2_accuracy": 0.8799579454773545,
+      "top1_balanced_accuracy": 0.801724351740682,
+      "top2_balanced_accuracy": 0.9171996615991534,
+      "precision": 0.7944823286981726,
+      "f1": 0.729473340369567,
+      "n_samples": 364289
+    },
+    "val": {
+      "top1_accuracy": 0.6913364338701619,
+      "top2_accuracy": 0.870373217511627,
+      "top1_balanced_accuracy": 0.6859591859391908,
+      "top2_balanced_accuracy": 0.8428051785766046,
+      "precision": 0.7841195487512405,
+      "f1": 0.7181562235895743,
+      "n_samples": 52034,
+      "mean_average_precision": 0.5880088054948145,
+      "per_class_ap": {
+        "B": 0.9592,
+        "CD4T": 0.6091,
+        "CD4TNaive": 0.6082,
+        "DC": 0.6692,
+        "FDC": 0.5224,
+        "Granulo": 0.4206,
+        "MC": 0.059,
+        "Macro": 0.7534,
+        "NK": 0.4418,
+        "NKT": 0.1912,
+        "PC": 0.7651,
+        "Stromal cells": 0.6949,
+        "TFH": 0.3876,
+        "TPR": 0.6398,
+        "TTOX": 0.6011,
+        "TTOXNaive": 0.7697,
+        "TTOX_exh": 0.8126,
+        "Treg": 0.6791
+      }
+    }
+  },
+  "knn": {
+    "k": 15,
+    "val": {
+      "top1_accuracy": 0.7635584425567898,
+      "top1_balanced_accuracy": 0.49458965455223614,
+      "f1": 0.7547258944878472
+    }
+  },
+  "clustering": {
+    "method": "MiniBatchKMeans(k=18, n_init=10)",
+    "val": {
+      "nmi": 0.248996027584971,
+      "ari": 0.14321982071572567
+    },
+    "all": {
+      "nmi": 0.24860643645348737,
+      "ari": 0.14287663608616716
+    }
+  },
+  "neighbourhood_purity": {
+    "k": 15,
+    "mean_purity": 0.6607192732956657,
+    "mean_lift": 49.935703326626914,
+    "per_class": {
+      "B": {
+        "purity": 0.8448853068815871,
+        "expected_chance": 0.5269823576892032,
+        "purity_lift": 1.6032515976177566,
+        "n_cells": 27421
+      },
+      "CD4T": {
+        "purity": 0.3423937722997081,
+        "expected_chance": 0.059249721336049506,
+        "purity_lift": 5.778825023627315,
+        "n_cells": 3083
+      },
+      "CD4TNaive": {
+        "purity": 0.24837758112094396,
+        "expected_chance": 0.00868662797401699,
+        "purity_lift": 28.593095256741588,
+        "n_cells": 452
+      },
+      "DC": {
+        "purity": 0.567834274952919,
+        "expected_chance": 0.03401622016373909,
+        "purity_lift": 16.69304444231649,
+        "n_cells": 1770
+      },
+      "FDC": {
+        "purity": 0.4344086021505376,
+        "expected_chance": 0.014894107698812315,
+        "purity_lift": 29.166473812001385,
+        "n_cells": 775
+      },
+      "Granulo": {
+        "purity": 0.3015151515151515,
+        "expected_chance": 0.0008456009532228927,
+        "purity_lift": 356.56907713498623,
+        "n_cells": 44
+      },
+      "MC": {
+        "purity": 0.012403100775193798,
+        "expected_chance": 0.0008263827497405542,
+        "purity_lift": 15.008905714800793,
+        "n_cells": 43
+      },
+      "Macro": {
+        "purity": 0.6017303532804614,
+        "expected_chance": 0.07996694469001038,
+        "purity_lift": 7.524738573082319,
+        "n_cells": 4161
+      },
+      "NK": {
+        "purity": 0.22435897435897437,
+        "expected_chance": 0.005996079486489603,
+        "purity_lift": 37.41761176857331,
+        "n_cells": 312
+      },
+      "NKT": {
+        "purity": 0.0781094527363184,
+        "expected_chance": 0.002575239266633355,
+        "purity_lift": 30.330949728967102,
+        "n_cells": 134
+      },
+      "PC": {
+        "purity": 0.5823899371069182,
+        "expected_chance": 0.002037129569127878,
+        "purity_lift": 285.8875281832206,
+        "n_cells": 106
+      },
+      "Stromal cells": {
+        "purity": 0.5489831092726646,
+        "expected_chance": 0.07433601106968521,
+        "purity_lift": 7.3851569565392525,
+        "n_cells": 3868
+      },
+      "TFH": {
+        "purity": 0.1400900900900901,
+        "expected_chance": 0.011377176461544375,
+        "purity_lift": 12.31325633065498,
+        "n_cells": 592
+      },
+      "TPR": {
+        "purity": 0.24449779911964786,
+        "expected_chance": 0.016008763500787948,
+        "purity_lift": 15.272747274179778,
+        "n_cells": 833
+      },
+      "TTOX": {
+        "purity": 0.2655518394648829,
+        "expected_chance": 0.03447745704731522,
+        "purity_lift": 7.7021875221380816,
+        "n_cells": 1794
+      },
+      "TTOXNaive": {
+        "purity": 0.5309854803830707,
+        "expected_chance": 0.02073644155744321,
+        "purity_lift": 25.6063934070924,
+        "n_cells": 1079
+      },
+      "TTOX_exh": {
+        "purity": 0.5733092514549468,
+        "expected_chance": 0.0638428719683284,
+        "purity_lift": 8.980004090971313,
+        "n_cells": 3322
+      },
+      "Treg": {
+        "purity": 0.30242019302152934,
+        "expected_chance": 0.04314486681784987,
+        "purity_lift": 7.009413061773834,
+        "n_cells": 2245
+      }
+    }
+  },
+  "silhouette": {
+    "score": -0.049427203834056854,
+    "n_samples": 10000,
+    "metric": "cosine"
+  },
+  "umap": {
+    "saved": true,
+    "n_neighbors": 15,
+    "min_dist": 0.1,
+    "metric": "cosine"
+  },
+  "train": {
+    "top1_accuracy": 0.705892848809599,
+    "top2_accuracy": 0.8799579454773545,
+    "top1_balanced_accuracy": 0.801724351740682,
+    "top2_balanced_accuracy": 0.9171996615991534,
+    "precision": 0.7944823286981726,
+    "f1": 0.729473340369567,
+    "n_samples": 364289
+  },
+  "val": {
+    "top1_accuracy": 0.6913364338701619,
+    "top2_accuracy": 0.870373217511627,
+    "top1_balanced_accuracy": 0.6859591859391908,
+    "top2_balanced_accuracy": 0.8428051785766046,
+    "precision": 0.7841195487512405,
+    "f1": 0.7181562235895743,
+    "n_samples": 52034,
+    "mean_average_precision": 0.5880088054948145,
+    "per_class_ap": {
+      "B": 0.9592,
+      "CD4T": 0.6091,
+      "CD4TNaive": 0.6082,
+      "DC": 0.6692,
+      "FDC": 0.5224,
+      "Granulo": 0.4206,
+      "MC": 0.059,
+      "Macro": 0.7534,
+      "NK": 0.4418,
+      "NKT": 0.1912,
+      "PC": 0.7651,
+      "Stromal cells": 0.6949,
+      "TFH": 0.3876,
+      "TPR": 0.6398,
+      "TTOX": 0.6011,
+      "TTOXNaive": 0.7697,
+      "TTOX_exh": 0.8126,
+      "Treg": 0.6791
+    }
+  }
+}

@@ -1,0 +1,175 @@
+{
+  "classes": [
+    "B",
+    "CD4T",
+    "CD4TNaive",
+    "DC",
+    "FDC",
+    "Granulo",
+    "MC",
+    "Macro",
+    "NK",
+    "NKT",
+    "PC",
+    "Stromal cells",
+    "TFH",
+    "TPR",
+    "TTOX",
+    "TTOXNaive",
+    "TTOX_exh",
+    "Treg"
+  ],
+  "n_classes": 18,
+  "epochs": 2000,
+  "n_repeats": 3,
+  "points": [
+    {
+      "label": "10/cls",
+      "n_labeled": 180,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.46670772277504263,
+      "bal_acc_std": 0.007778544656256373,
+      "mean_ap_mean": 0.32256826839198144,
+      "mean_ap_std": 0.01921057498132733,
+      "bal_acc_runs": [
+        0.47766,
+        0.46038,
+        0.46207
+      ],
+      "mean_ap_runs": [
+        0.34965,
+        0.30714,
+        0.31091
+      ]
+    },
+    {
+      "label": "50/cls",
+      "n_labeled": 900,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.5531909175470591,
+      "bal_acc_std": 0.004287120094749204,
+      "mean_ap_mean": 0.39555542002367855,
+      "mean_ap_std": 0.00399121799574276,
+      "bal_acc_runs": [
+        0.55091,
+        0.54947,
+        0.5592
+      ],
+      "mean_ap_runs": [
+        0.40068,
+        0.39504,
+        0.39095
+      ]
+    },
+    {
+      "label": "100/cls",
+      "n_labeled": 1800,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.5900355714511317,
+      "bal_acc_std": 0.003721970034313908,
+      "mean_ap_mean": 0.4307272306618128,
+      "mean_ap_std": 0.011657467651990569,
+      "bal_acc_runs": [
+        0.59254,
+        0.5928,
+        0.58477
+      ],
+      "mean_ap_runs": [
+        0.44537,
+        0.42997,
+        0.41684
+      ]
+    },
+    {
+      "label": "200/cls",
+      "n_labeled": 3600,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.627751633232839,
+      "bal_acc_std": 0.0025872676208539866,
+      "mean_ap_mean": 0.47223953917494166,
+      "mean_ap_std": 0.0021947236434675887,
+      "bal_acc_runs": [
+        0.63043,
+        0.62858,
+        0.62425
+      ],
+      "mean_ap_runs": [
+        0.46952,
+        0.47489,
+        0.4723
+      ]
+    },
+    {
+      "label": "1%",
+      "n_labeled": 3642,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.5075014345748616,
+      "bal_acc_std": 0.009389808152692755,
+      "mean_ap_mean": 0.46404206789244834,
+      "mean_ap_std": 0.007154330394435659,
+      "bal_acc_runs": [
+        0.51305,
+        0.51518,
+        0.49428
+      ],
+      "mean_ap_runs": [
+        0.46922,
+        0.46898,
+        0.45393
+      ]
+    },
+    {
+      "label": "1000/cls",
+      "n_labeled": 16311,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.6797209673811949,
+      "bal_acc_std": 0.004666078653790416,
+      "mean_ap_mean": 0.549428725755551,
+      "mean_ap_std": 0.00273594719683889,
+      "bal_acc_runs": [
+        0.67487,
+        0.67827,
+        0.68602
+      ],
+      "mean_ap_runs": [
+        0.54615,
+        0.55285,
+        0.54929
+      ]
+    },
+    {
+      "label": "10%",
+      "n_labeled": 36430,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.6163997622590569,
+      "bal_acc_std": 0.0012593291025279072,
+      "mean_ap_mean": 0.5400087226584196,
+      "mean_ap_std": 0.002833205713512039,
+      "bal_acc_runs": [
+        0.61808,
+        0.61608,
+        0.61504
+      ],
+      "mean_ap_runs": [
+        0.54263,
+        0.53607,
+        0.54132
+      ]
+    },
+    {
+      "label": "100%",
+      "n_labeled": 364289,
+      "n_repeats": 1,
+      "bal_acc_mean": 0.6859591859391908,
+      "bal_acc_std": 0.0,
+      "mean_ap_mean": 0.5880088054948145,
+      "mean_ap_std": 0.0,
+      "bal_acc_runs": [
+        0.6859591859391908
+      ],
+      "mean_ap_runs": [
+        0.5880088054948145
+      ]
+    }
+  ]
+}
