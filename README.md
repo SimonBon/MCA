@@ -488,23 +488,27 @@ This has an important practical implication: **panel curation matters more than 
 
 ### Label Efficiency
 
-How much labelled data does each model need to reach good performance? We train a linear probe on subsets of training labels: 10, 50, 100, 200, 1000 cells per class, and the full training set.
+How much labelled data does each model need to reach good performance? We train a linear probe on subsets of training labels in two ways: (1) a fixed number of cells per class, and (2) a fixed fraction of the training set per class.
 
-![Label Efficiency — Balanced Accuracy](docs/figures/fig10_label_efficiency.png)
+#### Fixed cells per class (10 → 50 → 100 → 200 → 1000)
 
-*Figure 10: Label efficiency curves (linear probe balanced accuracy) for all four models across all five datasets. X-axis: labelled cells per class (log scale). Each line is one model; bands show variability. The gap between models at low label counts reveals how information-dense the learned representations are.*
+![Label Efficiency — Fixed cells per class](docs/figures/fig10_label_efficiency_n.png)
 
-![Label Efficiency — MAP](docs/figures/fig11_label_efficiency_map.png)
+*Figure 10: Label efficiency curves with a fixed number of labelled cells per class (10, 50, 100, 200, 1000). Left column: balanced accuracy; right column: mean AP. Each row is one dataset. Error bars show std across 3 random seeds.*
 
-*Figure 11: Label efficiency curves (mean AP) — more sensitive to rare class recovery than balanced accuracy.*
+#### Fraction of training labels (1% → 10% → 100%)
+
+![Label Efficiency — Fraction](docs/figures/fig11_label_efficiency_pct.png)
+
+*Figure 11: Label efficiency curves at fixed fractions of per-class training labels (1%, 10%, 100%). Same layout as Figure 10. The fraction view normalises for dataset size, so a 1% point represents different absolute counts across datasets.*
 
 **Key observations:**
 
 - **CIM maintains its lead at all label regimes.** Even at 10 cells per class, CIM representations are the most linearly separable on CODEX_cHL_KRONOS18, CODEX_cHL, and MIBI_TNBC.
-- **CIM_ProgFusion closes the gap at very low labels.** On CODEX_DLBCL, CIM_ProgFusion is the best model at 10–50 labels/class — the cross-channel fusion encodes more structure that is recoverable with fewer labels.
-- **EarlyFusion32 shows the steepest learning curve.** Its performance improves rapidly from 100 to 1000 labels/class but starts lower at 10 labels — it requires more supervision to extract the cross-marker co-expression signal.
+- **CIM_ProgFusion is strongest on DLBCL at low labels.** At 10–50 cells/class the cross-channel fusion encodes more structure that is recoverable without many labels.
+- **EarlyFusion32 shows the steepest learning curve.** It starts lower at 10 cells/class but catches up at 1000 — it requires more supervision to extract cross-marker co-expression signals.
 - **ResNet is consistently weakest** at all label counts, reflecting the information bottleneck of its 256-dimensional output.
-- **All models converge at full LP**, but the relative ranking is preserved — label efficiency mostly reflects intrinsic feature quality, not capacity.
+- **The fraction view reveals dataset-size effects:** on CODEX_DLBCL (416k cells), 1% per class is ~3,640 cells — far more than on smaller datasets — explaining why the 1% point already yields high accuracy there.
 
 ---
 
