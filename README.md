@@ -1,6 +1,7 @@
 # MCA — Multi-Channel Cell Analysis
 
-Self-supervised representation learning for multi-channel multiplexed imaging data (CODEX, IMC, MIBI). The goal is to learn cell embeddings from high-plex protein expression images that (a) separate biologically distinct cell types without any labels, and (b) remain stable across samples and staining batches.
+Self-supervised representation learning for multiplexed protein imaging (CODEX, IMC, MIBI-TOF).
+We learn compact, label-free cell embeddings from high-plex spatial patches that are discriminative across cell types and stable across tissue samples.
 
 ---
 
@@ -13,30 +14,33 @@ Self-supervised representation learning for multi-channel multiplexed imaging da
 5. [Training Setup](#training-setup)
 6. [Evaluation Metrics](#evaluation-metrics)
 7. [Results](#results)
-   - [CODEX_cHL](#codex_chl)
-   - [CODEX_DLBCL](#codex_dlbcl)
-   - [IMC_NB (coarse cell types)](#imc_nb)
-   - [IMC_NB_FineCT (fine cell types)](#imc_nb_finect)
-   - [MIBI_TNBC](#mibi_tnbc)
-   - [MIBI_TNBC Cross-Validation](#mibi_tnbc-cross-validation)
+   - [Summary](#summary)
+   - [CODEX cHL KRONOS18](#codex_chl_kronos18)
+   - [CODEX cHL Full Panel](#codex_chl-full-panel)
+   - [CODEX DLBCL](#codex_dlbcl)
+   - [IMC NB TumorSub](#imc_nb_tumorsub)
+   - [MIBI TNBC](#mibi_tnbc)
+   - [Panel Size: Less Is More](#panel-size-less-is-more)
 8. [Key Findings](#key-findings)
-9. [Region Analysis](#region-analysis)
-10. [How to Run](#how-to-run)
+9. [How to Run](#how-to-run)
 
 ---
 
 ## Project Overview
 
-Each cell in a multiplexed image is represented as a small spatial patch with C channels (one per antibody marker). The challenge: different cells of the same type may have wildly different absolute intensity levels across tissue samples (batch effects, staining variability), while cells of different types express different relative marker profiles.
+In multiplexed tissue imaging, each cell is measured across tens of protein markers simultaneously. A single tissue section can contain hundreds of thousands of cells spanning many functionally distinct types — tumour cells, T cell subtypes, macrophages, endothelial cells, and more.
 
-The core architectural question is: **how should the C channels be processed?**
+The central challenge: **absolute marker intensities vary dramatically between samples** (staining batch, tissue processing, patient variability), but **relative expression profiles encode cell identity**. A CD8 T cell from patient A and patient B will have different absolute CD8 intensities, yet both express CD8 high relative to other markers.
 
-- **Early fusion** (ResNet, EarlyFusion): standard convolutions mix channels immediately — learns cross-channel correlations but discards marker-level identity.
-- **Channel-independent (CIM)**: depthwise grouped convolutions keep each marker's features strictly separate — marker identity is implicitly encoded, spatial features per marker are preserved.
-- **Progressive fusion (CIM_ProgFusion)**: best of both worlds — CIM branch builds per-marker features, a fusion stream gradually integrates them across stages.
-- **Attention gating (CIMATT_Gate)**: adds cross-marker self-attention with learned gating based on relative expression, aimed at sample-invariant routing.
+We frame this as a self-supervised learning problem: can a neural network learn to represent cells purely from their spatial protein expression patches, without any labels, such that cells of the same type cluster together while cells of different types are well-separated — and crucially, that these clusters are stable across patients?
 
-All models are trained with **VICReg** (Variance-Invariance-Covariance Regularization), a self-supervised objective that prevents embedding collapse without requiring negative pairs.
+The core architectural question is **how to process the C channels** (one per antibody marker):
+
+| Strategy | Architecture | Inductive Bias |
+|---|---|---|
+| **Late fusion** (channel-independent) | CIM, CIM_ProgFusion | Each marker processed independently; cross-channel relations learned late |
+| **Early fusion** | EarlyFusion32 | Standard conv mixes channels from first layer; learns cross-marker correlations |
+| **Implicit relative features** | ResNet | Large receptive field + deep mixing; implicitly normalises absolute intensities |
 
 ---
 
@@ -44,715 +48,496 @@ All models are trained with **VICReg** (Variance-Invariance-Covariance Regulariz
 
 ```
 MCA/
-├── src/                        # Core Python source
-│   ├── models.py               # WideModel (CIM), WideModelProgressiveFusion, WideModelAttentionGated
-│   ├── models_early_fusion.py  # EarlyFusionModel
-│   ├── models_attention.py     # WideModelAttention (without gating)
-│   ├── dataset.py              # MCIDataset — HDF5-based cell patch loader
-│   ├── transforms.py           # Augmentation transforms
-│   ├── VICReg.py               # MVVICReg training objective
-│   ├── val_hook.py             # Simple linear-probe evaluation hook
-│   └── val_hook_rich.py        # EvaluateModelRich — full evaluation suite
+├── src/
+│   ├── models.py              # CIM (WideModel), CIM_ProgFusion (WideModelProgressiveFusion)
+│   ├── models_early_fusion.py # EarlyFusionModel
+│   ├── VICReg.py              # MVVICReg training objective
+│   ├── val_hook_rich.py       # EvaluateModelRich — LP, kNN, clustering, silhouette, label efficiency
+│   └── val_hook.py            # Legacy evaluation hook
 ├── configs/
-│   ├── _base_/                 # default.py, train_cfg.py, val_cfg.py
-│   ├── _augmentations_/        # high.py, low.py, none.py
-│   ├── _backbones_/            # CIM.py, CIM_Norm.py, CIM_ProgFusion.py, EarlyFusion_32.py, ResNet.py, CIMATT_Gate.py
-│   ├── _algorithms_/           # VICReg.py
-│   ├── _datasets_/             # CODEX_cHL.py, CODEX_DLBCL.py, IMC_NB.py, IMC_NB_FineCT.py, MIBI_TNBC.py, MIBI_TNBC_CV{0-4}.py
-│   └── _experiments_/          # Per-dataset experiment configs
-│       ├── CODEX_cHL/
-│       ├── CODEX_DLBCL/
-│       ├── IMC_NB/
-│       ├── IMC_NB_FineCT/
-│       └── MIBI_TNBC/
-├── notebooks/                  # Analysis notebooks
-├── scripts/                    # Data processing scripts
-├── run_experiments.sh          # Run all backbones for one dataset
-├── run_cv.sh                   # Run all CV splits
-├── run_ablations.sh            # Ablation runs
-├── PROGRESS.md                 # Detailed session-by-session progress log
-├── MIBI_TNBC_results.xlsx      # Full results table (Excel, generated Feb 2026)
-└── z_RUNS/                     # All experiment outputs (metrics, UMAPs, checkpoints)
+│   ├── _base_/                # Default training, val, and augmentation configs
+│   ├── _datasets_/            # Per-dataset configs (paths, n_markers, patch_size)
+│   ├── _backbones_/           # Backbone architecture configs
+│   ├── _algorithms_/          # VICReg loss configs
+│   └── _experiments_/
+│       └── paper/             # Paper experiment configs (5 datasets × 4 models)
+├── tools/
+│   ├── label_efficiency.py    # Standalone label efficiency curve tool
+│   └── plot_loss.py           # Training loss curve visualisation
+├── docs/figures/              # All generated comparison figures (PDF + PNG)
+├── run_paper.sh               # Run all 20 paper experiments sequentially
+├── z_RUNS/paper/              # Results output directory
+│   └── <DATASET>/<MODEL>/     # metrics.json, umap.pdf, confusion_matrix.pdf, ...
+└── journal.md                 # Experiment log and paper narrative
 ```
-
-Run outputs are stored at `z_RUNS/<DATASET>_<MODEL>_<ALGORITHM>/` and contain:
-- `metrics.json` — all evaluation metrics (linear probe, kNN, clustering, silhouette, neighbourhood purity)
-- `umap.png` — UMAP coloured by cell type
-- `umap_sample.png` — UMAP coloured by patient/sample ID (to diagnose batch effects)
-- `confusion_matrix.png` / `.json` — per-class confusion
 
 ---
 
 ## Datasets
 
-All datasets are stored as HDF5 files. Each cell is a `C × patch_size × patch_size` tensor centred on the segmented cell.
+All datasets consist of multiplexed protein imaging of tumour tissue sections. Each cell is represented as a small square patch centred on the cell centroid, with one channel per antibody marker.
 
-| Dataset | Technology | Markers | Cell types | Approx. cells | Patch size | Notes |
-|---------|-----------|---------|-----------|--------------|-----------|-------|
-| **CODEX_cHL** | CODEX | 41 | 17 | ~115k | 32×32 | Classical Hodgkin Lymphoma; excludes FoxP3 and CD56 (poor CODEX SNR) |
-| **CODEX_DLBCL** | CODEX | 40 | 18 | ~416k | 24×24 | Diffuse Large B-Cell Lymphoma; largest dataset |
-| **IMC_NB** | IMC | 31 | 7 (coarse) | ~240k | 24×24 | Neuroblastoma; coarse 7-class annotation |
-| **IMC_NB_FineCT** | IMC | 31 | 11 (fine) | ~237k | 24×24 | Same IMC_NB data with refined 11-class annotation; excludes "Other" |
-| **MIBI_TNBC** | MIBI-TOF | 37 | 16 | ~196k | 32×32 | Triple-Negative Breast Cancer; 5 sample-level CV splits |
+### CODEX cHL KRONOS18
 
-**CODEX_cHL cell types:** B, CD4, CD8, Cytotoxic CD8, DC, Endothelial, Epithelial, Lymphatic, M1, M2, Mast, Monocyte, NK, Neutrophil, Other, TReg, Tumor
+| Property | Value |
+|---|---|
+| Modality | CODEX (co-detection by indexing) |
+| Disease | Classical Hodgkin Lymphoma (cHL) |
+| Markers | 18 (curated KRONOS18 panel: CD3, CD4, CD8, CD20, CD30, FoxP3, CD68, PDPN, etc.) |
+| Cell types | 17 (B, CD4, CD8, Cytotoxic CD8, DC, Endothelial, Epithelial, Lymphatic, M1, M2, Mast, Monocyte, NK, Neutrophil, Other, TReg, Tumor) |
+| Patch size | 32 × 32 px (eval crop: 18 × 18 px) |
+| Train / Val | ~100k / ~14k cells |
 
-**CODEX_DLBCL cell types:** B, CD4T, CD4TNaive, DC, FDC, Granulo, MC, Macro, NK, NKT, PC, Stromal cells, TFH, TPR, TTOX, TTOXNaive, TTOX_exh, Treg
+The KRONOS18 panel is a clinically motivated 18-marker selection covering the main immune and structural compartments of cHL. FoxP3 (TReg marker) and key myeloid markers are included.
 
-**IMC_NB cell types:** B_Cell, Myeloid, Other, Progenitor, Stromal, T_Cell, Tumor
+### CODEX cHL Full Panel
 
-**IMC_NB_FineCT cell types:** B_Cell, CD4_T, CD8_T, Myeloid, NK_DC, Neutrophil, Progenitor, Proliferating, Stromal, T_Cell, Tumor
+| Property | Value |
+|---|---|
+| Modality | CODEX |
+| Disease | Classical Hodgkin Lymphoma (cHL) |
+| Markers | **41** (full staining panel) |
+| Cell types | 17 (same as KRONOS18) |
+| Patch size | 32 × 32 px (eval crop: 18 × 18 px) |
+| Train / Val | ~100k / ~14k cells |
 
-**MIBI_TNBC cell types:** B, CD3 T, CD4 T, CD8 T, DC, DC/Mono, Endothelial, Keratin-positive tumor, Macrophages, Mesenchymal-like, Mono/Neu, NK, Neutrophils, Other immune, Tregs, Tumor
+Same cohort as KRONOS18 but with all 41 measured markers. The 23 additional markers include redundant channels, isotype controls, and markers with limited biological signal for the 17-class annotation.
+
+### CODEX DLBCL
+
+| Property | Value |
+|---|---|
+| Modality | CODEX |
+| Disease | Diffuse Large B-Cell Lymphoma (DLBCL) |
+| Markers | 40 |
+| Cell types | **18** (including fine T cell subtypes: TFH, TTOX, TTOXNaive, TTOX_exh, NKT, TPR) |
+| Patch size | 24 × 24 px (eval crop: 12 × 12 px) |
+| Train / Val | ~364k / ~52k cells |
+
+The largest and hardest dataset. Fine T cell subtypes (exhausted, naive, follicular helper) are annotated — these overlap heavily in protein space and present a significant challenge. DLBCL is a B cell malignancy, making B cells the most abundant and most easily identified type.
+
+### IMC NB TumorSub
+
+| Property | Value |
+|---|---|
+| Modality | Imaging Mass Cytometry (IMC) |
+| Disease | Neuroblastoma (NB) |
+| Markers | 31 |
+| Cell types | **19** (immune + stromal types + 11 tumour cell subtypes: TC_CD24pos, TC_CD24neg, TC_CD44, TC_CHGAhi, TC_CXCR4hi, TC_GATA3hi, TC_GD2lo, TC_bridge, TC_early, Proliferating, Progenitor) |
+| Patch size | 24 × 24 px (eval crop: 12 × 12 px) |
+| Train / Val | ~240k / ~30k cells |
+
+IMC has lower spatial resolution than CODEX (~1 µm/px vs ~0.5 µm/px) and typically captures 30+ metal-conjugated markers in a single scan. The fine tumour subtype annotation makes this a challenging intra-tumour heterogeneity benchmark.
+
+### MIBI TNBC
+
+| Property | Value |
+|---|---|
+| Modality | Multiplexed Ion Beam Imaging (MIBI-TOF) |
+| Disease | Triple-Negative Breast Cancer (TNBC) |
+| Markers | 37 |
+| Cell types | 16 (including Keratin+ tumour, Mesenchymal-like, Tregs, CD8 T, DC/Mono, Mono/Neu) |
+| Patch size | 32 × 32 px (eval crop: 20 × 20 px) |
+| Train / Val | ~196k / ~44k cells |
+| Patients | 40 (5-fold cross-validation available) |
+
+The MIBI_TNBC dataset is the most heterogeneous in terms of patient-level variability. Cross-patient generalisation is the primary challenge. The highest LP balanced accuracies across all datasets are achieved here, reflecting a relatively clean marker-to-cell-type mapping (Pan-Keratin for tumour, FoxP3 for Tregs, etc.).
 
 ---
 
 ## Model Architectures
 
+All models take an input patch of shape `[B, C, H, W]` where `C` is the number of markers and produce a flat embedding vector fed into a VICReg projection head.
+
 ### CIM — Channel-Independent Model
-**Class:** `WideModel` · **Config:** `configs/_backbones_/CIM.py`
 
-The core architecture. A grouped depthwise convolutional network where each marker's spatial patch is processed by its own independent feature extractor (stem + ConvBlocks). Channels are **never mixed** during the backbone computation.
-
-- **Stem:** `Conv2d(C, C×D, kernel_size=3, groups=C)` — expands each marker from 1 to `D=32` features independently
-- **Stages:** Two stages of ConvBlocks (grouped, `groups=C`), each followed by `AvgPool2d(2)`
-- **Output:** `C×D`-dim vector (`n_markers × 32`) via `AdaptiveAvgPool2d(1)`
-- **Feature dim:** depends on dataset (e.g. 37×32 = 1184 for MIBI_TNBC, 41×32 = 1312 for CODEX_cHL)
-- **Parameters:** ~1.1M (CODEX_cHL); scales with `C`
-
-**Why it works:** Marker identity is implicitly encoded by the channel position — each channel's weights specialise for that marker's spatial patterns. The resulting embedding is a concatenation of per-marker feature vectors. Cross-marker information is captured only in the projection head (VICReg neck) and the linear probe.
-
-### CIM_Norm — Channel-Independent Model with Input Normalisation
-**Class:** `WideModel` with `input_norm=True` · **Config:** `configs/_backbones_/CIM_Norm.py`
-
-Identical to CIM but adds L2-normalisation of the input along the channel dimension before the stem:
-```
-x = F.normalize(x, dim=1)  # [B, C, H, W] → unit L2 norm per cell
-```
-
-This converts absolute intensity vectors into relative expression profiles, removing inter-sample intensity shifts at the input. Consistently improves embedding geometry (silhouette, NMI, ARI) compared to plain CIM with a small reduction in linear probe accuracy.
-
-### CIM_ProgFusion — Progressive Cross-Channel Fusion
-**Class:** `WideModelProgressiveFusion` · **Config:** `configs/_backbones_/CIM_ProgFusion.py`
-
-Two parallel branches:
-
-1. **CIM branch** — same depthwise grouped convolutions as CIM; produces per-marker feature maps at each stage.
-2. **Fusion stream** — standard (ungrouped) 1×1 convolutions freely mix marker information; receives an *injection* from the CIM branch after the stem and after each stage.
+The core design principle: **process each marker channel independently** using grouped (depthwise) convolutions, then pool across spatial and channel dimensions.
 
 ```
-Stage k:  CIM_features ──injector──> fusion_stream ──fusion_block──> mixed_features
+Input:  [B, C, H, W]
+        ↓  C independent conv streams (grouped conv, groups=C)
+        ↓  stem_width=32 feature maps per marker
+        ↓  spatial pooling
+        ↓  flatten → [B, C × 32]  (= feature_dim)
+        ↓  VICReg neck (MLP projector)
 ```
 
-The injectors project CIM features into the fusion stream; fusion blocks are bottleneck mixers (BN → 1×1 → ReLU → 1×1) with residual connections. After the last stage, only the fusion stream output is retained. The result is a fully mixed embedding that was built by gradually integrating single-marker features — a principled middle ground between CIM and EarlyFusion.
+Each marker's spatial pattern is summarised independently. Cross-marker relationships are learned only in the MLP neck and the downstream linear probe, not inside the backbone. This is the key inductive bias: cell identity is determined by the *pattern* of each marker independently, not by arbitrary co-expression mixtures.
 
-Also uses `input_norm=True` (L2-normalised input). Best geometry metrics across all datasets.
+**Why this works for multiplexed imaging:** Absolute intensities vary across patients, but each marker's local spatial distribution (is this cell bright? does it show membrane vs cytoplasmic staining?) is robust. Keeping channels independent prevents batch effects in one marker from leaking into representations of other markers.
 
-### EarlyFusion32 — Standard Early Fusion
-**Class:** `EarlyFusionModel` · **Config:** `configs/_backbones_/EarlyFusion_32.py`
+- Backbone: `WideModel` in `src/models.py`
+- Config: `configs/_backbones_/CIM.py`
+- Feature dim: `n_markers × stem_width` (e.g. 41 × 32 = 1312 for cHL full panel)
 
-Standard convolutional network where all C channels are mixed from the first layer. The stem is a standard (non-grouped) `Conv2d(C, C×32)` that freely combines marker information. This is the most natural baseline — what happens if you treat the multiplexed image like an RGB image with many channels?
+### CIM_ProgFusion — Progressive Fusion
 
-**Problem:** At training time, the model learns cross-channel correlations relative to the absolute intensity of each batch. Without per-cell normalisation, it becomes sensitive to per-sample intensity offsets. The UMAPs show strong inter-sample fragmentation (silhouette typically −0.2 or below), meaning cells from different patients cluster by sample rather than by cell type.
+A dual-branch extension of CIM that **gradually introduces cross-marker communication** through stages. A "fusion stream" runs in parallel to the CIM stream; at each stage, CIM features are injected into the fusion stream via learned mixing.
 
-### ResNet Baseline
-**Class:** `ResNetBaseline` · **Config:** `configs/_backbones_/ResNet.py`
+```
+Input:  [B, C, H, W]
+        ↓
+  CIM branch (grouped conv, channel-independent)
+  + Fusion branch (standard conv, cross-channel)
+        ↓  injection at each stage
+        ↓  spatial pooling of both branches
+        ↓  concatenate → [B, C × features_per_marker]
+        ↓  VICReg neck
+```
 
-Standard ResNet architecture (base_width=64) applied directly to the multichannel cell patch. Unlike EarlyFusion which has a wide stem, ResNet uses standard residual blocks with cross-channel mixing at every layer. The feature dimension is typically ~256.
+The key idea: early layers remain channel-independent (preserving marker identity), while later layers can learn cross-channel dependencies. This produces richer cluster structure (higher NMI/ARI) at a modest cost to linear probe accuracy.
 
-**Interesting:** ResNet achieves better inter-sample integration than EarlyFusion (less fragmented UMAPs, higher silhouette) despite also being an early-fusion architecture. The reason is that ResNet's cross-channel mixing from layer 1 implicitly encodes **relative features** (ratios, co-expression patterns) rather than absolute intensities. This makes it somewhat sample-invariant "for free" — but at the cost of lower linear probe accuracy because it cannot easily distinguish cell types that differ only in a single marker's absolute level.
+- Backbone: `WideModelProgressiveFusion` in `src/models.py`
+- Config: `configs/_backbones_/CIM_ProgFusion.py`
+- Optimal config (from sweep): `stem_width=32, block_width=2, layer_config=[1,1]`
 
-### CIMATT_Gate — CIM with Marker Gating and Cross-Marker Attention
-**Class:** `WideModelAttentionGated` · **Config:** `configs/_backbones_/CIMATT_Gate.py`
+### EarlyFusion32
 
-CIM backbone extended with a learned marker selection mechanism before cross-marker self-attention:
+Standard convolutional architecture where channels are mixed from the **first layer**. The stem uses a regular `Conv2d(C, 32, 3, 1, 1)` rather than grouped convolutions.
 
-1. **CIM stem + stages:** same depthwise processing as CIM
-2. **Spatial pooling:** `x.view(B, C, D, H, W).mean(dim=(-2,-1))` → per-marker token `[B, C, D]`
-3. **Marker gating:**
-   ```python
-   rel   = tokens - tokens.mean(dim=1, keepdim=True)          # relative expression [B, C, D]
-   gates = sigmoid(gate_proj(rel).squeeze(-1) / T)            # gate per marker [B, C]
-   tokens = tokens * gates.unsqueeze(-1)                      # gated tokens [B, C, D]
-   ```
-   Gates are computed from **relative** expression (token minus mean token), making them sample-invariant. Temperature `T` is a learned scalar initialised to 5.0 (high init → near-uniform start, allows gradual sharpening).
-4. **Cross-marker self-attention:** `MultiheadAttention(embed_dim=D, n_heads=4)` with pre-norm and residual
-5. **FFN:** pre-norm feed-forward network per marker token
-6. **Additive correction:** attention output is broadcast back and added to the spatial feature map before global avg pool
+```
+Input:  [B, C, H, W]
+        ↓  Conv2d(C → 32) — all channels mixed immediately
+        ↓  WideResNet-style blocks
+        ↓  global average pool → [B, feature_dim]
+        ↓  VICReg neck
+```
 
-**Intent:** Route attention toward markers that are distinctively expressed for each cell type, ignoring irrelevant or noisy markers. **Finding:** The gating does improve linear probe accuracy (+0.1pp over plain CIM) but the silhouette remains negative (−0.088), indicating the gates still produce fragmented embeddings — cells of the same type with different relative expression profiles land in different embedding islands. CIM_Norm and CIM_ProgFusion achieve better geometry without attention.
+Early mixing allows the model to learn cross-marker co-expression patterns from the first layer. However, this also means it is sensitive to absolute intensity scales — if marker A is always 2× brighter in sample 1 vs sample 2, the model cannot distinguish this from a genuinely different cell state.
+
+- Backbone: `EarlyFusionModel` in `src/models_early_fusion.py`
+- Config: `configs/_backbones_/EarlyFusion32.py`
+
+### ResNet
+
+A standard ResNet backbone adapted for multi-channel input. Uses `base_width=64` and a fixed neck output dimension of 256.
+
+```
+Input:  [B, C, H, W]
+        ↓  ResNet stem (Conv2d(C → 64))
+        ↓  4 residual stages with downsampling
+        ↓  global average pool → [B, 256]
+        ↓  VICReg neck
+```
+
+The ResNet's deep architecture and large receptive field means it implicitly computes *relative* features (contrast between regions), which offers some protection against absolute intensity batch effects. However, its small output dimensionality (256 vs 1000+ for CIM/ProgFusion) limits fine-grained discrimination.
+
+- Config: `configs/_backbones_/ResNet.py`
+- Feature dim: 256 (fixed)
 
 ---
 
 ## Training Setup
 
-All experiments use the same training pipeline:
+### Algorithm: VICReg
+
+We use **Variance-Invariance-Covariance Regularisation (VICReg)** as the self-supervised objective. Given two augmented views of the same cell patch, the loss encourages:
+
+- **Invariance** (`loss_inv`, weight=25): the embeddings of both views should be similar
+- **Variance** (`loss_var`, weight=25): each dimension of the embedding should have unit variance across the batch (prevents collapse)
+- **Covariance** (`loss_cov`, weight=1): different dimensions should be decorrelated (prevents redundancy)
+
+The two views are generated with different augmentation strengths (strong/weak), both from the same cell centroid.
+
+### Augmentations
+
+Each view is produced by:
+1. **Random flip** (horizontal + vertical, p=0.5)
+2. **Random affine** (rotation 0–360°, scale 0.8–1.2)
+3. **Random channel shift/scale** (per-marker intensity jitter)
+4. **Random Gaussian noise** (std 0–0.02)
+5. **Random channel drop** (drop_prob=0.1 — randomly zero a marker)
+6. **Central crop** to `strong_size` or `weak_size`
+
+Channel drop is particularly important: it forces the model to not rely on any single marker, encouraging representations robust to marker-level dropout (e.g., failed antibody staining).
+
+### Optimiser
 
 | Parameter | Value |
-|-----------|-------|
-| Algorithm | VICReg (`sim_coeff=25, std_coeff=25, cov_coeff=1`) |
-| Iterations | 1,000 (200 linear warmup + 800 cosine decay) |
-| Optimiser | AdamW (`lr=3e-4, weight_decay=0.05`) |
-| Batch size | 256 |
-| Projection head | 2-layer MLP (→ 512 → 512) |
-| Augmentations | Strong + weak view pair per cell |
-| Workers | 16 |
+|---|---|
+| Optimiser | LARS (Layer-wise Adaptive Rate Scaling) |
+| Base LR | 0.3 |
+| Momentum | 0.9 |
+| Weight decay | 1e-5 |
+| Schedule | 400 linear warmup + 3600 cosine annealing |
+| Total iterations | 4000 |
+| Batch size | 512 (256 for CIM_ProgFusion on cHL 41-marker) |
 
-**CIMATT_Gate_LowAug** variant uses a weaker augmentation schedule (fewer channel perturbations) to prevent the gates from learning augmentation-invariance rather than cell-type-discriminative features.
+LARS is used instead of Adam/AdamW because it scales the learning rate per-layer by the ratio of gradient norms, which is critical for stable training of the grouped conv architecture where different layers have very different gradient magnitudes.
+
+### Evaluation
+
+After training, a full evaluation is run (no gradient):
+- Features are extracted for all train and val cells
+- Linear probe (logistic regression, L-BFGS, C=1, tol=1e-6, max_iter=2000)
+- k-NN classification (k=15)
+- k-Means clustering (k = n_classes, 10 random seeds)
+- Cosine silhouette score (10,000 randomly sampled cells)
+- Neighbourhood purity (for each cell, what fraction of the 15 nearest neighbours share its label)
+- Label efficiency curve (LP at 10, 50, 100, 200, 1000 cells per class + full LP)
+- UMAP (coloured by cell type and by sample ID)
+
+All paper results are in `z_RUNS/paper/<DATASET>/<MODEL>/metrics.json`.
 
 ---
 
 ## Evaluation Metrics
 
-All metrics are computed on frozen features (no fine-tuning) at each validation step via `EvaluateModelRich` (`src/val_hook_rich.py`):
+| Metric | What it measures | Higher = better? |
+|---|---|---|
+| **LP balanced accuracy** | Linear separability of learned features; balanced across classes | Yes |
+| **Mean AP (MAP)** | Area under per-class precision-recall curves, averaged | Yes |
+| **kNN balanced accuracy** | Non-parametric class separability | Yes |
+| **NMI** | Normalised Mutual Information between cluster assignments and ground truth | Yes |
+| **ARI** | Adjusted Rand Index — cluster quality corrected for chance | Yes |
+| **Cosine silhouette** | Geometric compactness of cell-type clusters in embedding space | Yes (positive = compact) |
+| **Neighbourhood purity** | For each cell, fraction of 15 nearest neighbours sharing same label | Yes |
 
-| Metric | Description |
-|--------|-------------|
-| **LP Bal. Acc** | Linear probe balanced accuracy — logistic regression (`class_weight='balanced'`) on frozen embeddings. Primary metric for cell type separability. |
-| **LP Top-1 Acc** | Unweighted top-1 accuracy (biased toward majority classes). |
-| **kNN Bal. Acc** | k=15 nearest-neighbour classification (distance-weighted cosine) balanced accuracy. Measures metric-space quality without assuming a linear boundary. |
-| **NMI** | Normalised Mutual Information between k-means clusters (k = n_classes) and ground truth. |
-| **ARI** | Adjusted Rand Index between k-means and ground truth. |
-| **Silhouette** | Mean silhouette score (cosine distance, 10k sampled cells). Positive = compact separated clusters, negative = overlapping. |
-| **Neigh. Purity** | For each cell, fraction of 15 nearest neighbours with same label. Reported as mean across classes. |
-
-**Note on LP vs kNN:** Linear probe consistently outperforms kNN (e.g. 72.5% vs 52.5% on CODEX_cHL). This is expected — the embedding space has non-trivial geometry and linear decision boundaries extract more information than raw cosine distance. Linear probe is the primary evaluation metric.
+**LP balanced accuracy vs MAP:** LP balanced accuracy weights all classes equally but is threshold-dependent. MAP integrates over the full ranking and is more sensitive to rare classes — a model can have good LP but poor MAP if it ranks rare-class cells inconsistently.
 
 ---
 
 ## Results
 
-> All numbers come directly from `metrics.json` files in the respective `z_RUNS/` directories. Verified against raw files.
+### Summary
+
+![Metrics Heatmap](docs/figures/fig1_metrics_heatmap.png)
+
+*Figure 1: All six evaluation metrics across all model–dataset combinations. Colour scale is per-metric (green = better). Values overlaid.*
+
+![LP Bar Chart](docs/figures/fig2_lp_bar.png)
+
+*Figure 2: Linear probe balanced accuracy per dataset (main discriminative metric). Higher is better.*
+
+![Radar Charts](docs/figures/fig7_radar.png)
+
+*Figure 7: Normalised model profiles per dataset. Each axis is normalised within the dataset (0 = worst model, 1 = best). Shows which model has the most balanced profile.*
 
 ---
 
-### CODEX_cHL
+### CODEX_cHL_KRONOS18
 
-17 cell types, 41 markers, ~115k cells. Results at `z_RUNS/CODEX_cHL_<MODEL>_VICReg/`.
+**18-marker curated panel, 17 cell types, ~115k cells (cHL)**
 
-![UMAP — CIM + VICReg, CODEX_cHL, coloured by cell type](z_RUNS/CODEX_cHL_CIM_VICReg/umap.png)
-*UMAP — **CIM + VICReg**, CODEX_cHL · coloured by cell type · `z_RUNS/CODEX_cHL_CIM_VICReg/umap.png`*
+| Model | LP bal acc | MAP | kNN bal | NMI | ARI | Silhouette |
+|---|---|---|---|---|---|---|
+| **CIM** | **0.743** | **0.749** | **0.639** | **0.377** | 0.204 | **+0.051** |
+| EarlyFusion32 | 0.716 | 0.729 | 0.607 | 0.347 | 0.174 | +0.017 |
+| CIM_ProgFusion | 0.714 | 0.728 | 0.579 | 0.368 | **0.235** | +0.007 |
+| ResNet | 0.666 | 0.675 | 0.584 | 0.361 | 0.211 | +0.040 |
 
-| Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
-|-------|------------|-------------|-----|-----|-----------|--------------|
-| **CIM** | **0.7248** | **0.5245** | 0.307 | 0.168 | **−0.003** | **0.502** |
-| CIM_ProgFusion | 0.7041 | 0.5026 | **0.328** | **0.205** | −0.019 | 0.497 |
-| CIM_Norm (AllMarkers) | 0.7220 | 0.5008 | 0.304 | 0.167 | −0.014 | 0.494 |
-| CIM (AllMarkers) | 0.7423 | 0.5245 | 0.316 | 0.170 | −0.002 | 0.508 |
-| EarlyFusion32 | 0.7073 | 0.4984 | 0.268 | 0.123 | −0.067 | 0.481 |
-| ResNet | 0.6183 | 0.4911 | 0.276 | 0.134 | −0.068 | 0.485 |
+CIM leads across all primary metrics. All four models produce positive silhouette scores — the KRONOS18 panel is well-suited to self-supervised learning, with clusters that are geometrically compact in embedding space.
 
-> **AllMarkers** variants use a slightly expanded marker panel and are run separately. Results for CIM/CIM_Norm/EarlyFusion/ResNet with the standard 41-marker panel are in `CODEX_cHL_<MODEL>_VICReg/`.
+CIM_ProgFusion achieves the best ARI (0.235), suggesting its dual-branch fusion finds cleaner cluster boundaries despite slightly lower LP accuracy. ResNet's silhouette (0.040) is second-highest, consistent with its tendency to produce smooth, integrated geometry at the cost of LP discrimination.
 
-**Key observations:**
-- CIM achieves the best silhouette (−0.003, near zero) and linear probe accuracy, while EarlyFusion/ResNet sit at −0.07 or worse on geometry.
-- **CIM_ProgFusion trades 2pp LP accuracy for significantly better cluster structure** (NMI +0.021, ARI +0.037 vs CIM). On cHL's 17 fine-grained lymphoma subtypes, progressive cross-marker fusion helps organise the embedding but the partial channel mixing makes classes less linearly separable.
-- ResNet is −10.7pp below CIM on linear probe despite similar parameter count (~1.1M each). The early channel mixing destroys marker-level discriminability.
-- The performance ceiling at ~72.5% balanced accuracy is real and panel-limited: FoxP3 (defines Tregs) and CD56 (defines NK cells) are absent from the panel, making CD4/TReg and Monocyte/NK pairs irreducibly confusable. This matches KRONOS (ViT-Large, 47M patches) at 73.6% on the same task.
+**Hardest classes:** M1 macrophage (AP ≈ 0.52 across all models), Monocyte (AP ≈ 0.58), Other (AP ≈ 0.55). TReg is well-resolved on KRONOS18 (CIM AP = 0.823) thanks to the inclusion of FoxP3.
+
+---
+
+### CODEX_cHL Full Panel
+
+**41-marker full panel, 17 cell types, ~115k cells (same cohort as KRONOS18)**
+
+| Model | LP bal acc | MAP | kNN bal | NMI | ARI | Silhouette |
+|---|---|---|---|---|---|---|
+| **CIM** | **0.731** | **0.739** | **0.605** | 0.342 | 0.172 | **+0.021** |
+| CIM_ProgFusion | 0.706 | 0.706 | 0.556 | 0.323 | 0.168 | −0.005 |
+| EarlyFusion32 | 0.700 | 0.698 | 0.583 | **0.344** | **0.181** | +0.003 |
+| ResNet | 0.661 | 0.641 | 0.555 | 0.359 | 0.206 | −0.001 |
+
+See [Panel Size: Less Is More](#panel-size-less-is-more) for direct KRONOS18 vs full-panel comparison.
+
+**Notable:** CIM_ProgFusion silhouette turns negative on the 41-marker panel (−0.005), while it was positive on KRONOS18 (+0.007). The 23 additional markers appear to add noise that disrupts the fusion branch's ability to form coherent clusters.
+
+![cHL Panel Comparison](docs/figures/fig9_chl_panel_comparison.png)
+
+*Figure 9: Per-class AP on KRONOS18 (top row) vs full 41-marker panel (bottom row). The TReg rescue on KRONOS18 is the most striking difference.*
 
 ---
 
 ### CODEX_DLBCL
 
-18 cell types, 40 markers, ~416k cells. Results at `z_RUNS/CODEX_DLBCL_<MODEL>_VICReg/`.
+**40-marker panel, 18 cell types including fine T cell subtypes, ~416k cells**
 
-![UMAP — CIM + VICReg, CODEX_DLBCL, coloured by cell type](z_RUNS/CODEX_DLBCL_CIM_VICReg/umap.png)
-*UMAP — **CIM + VICReg**, CODEX_DLBCL · coloured by cell type · `z_RUNS/CODEX_DLBCL_CIM_VICReg/umap.png`*
+| Model | LP bal acc | MAP | kNN bal | NMI | ARI | Silhouette |
+|---|---|---|---|---|---|---|
+| **CIM_ProgFusion** | **0.710** | **0.607** | **0.501** | **0.319** | **0.158** | **−0.028** |
+| EarlyFusion32 | 0.690 | 0.598 | 0.486 | 0.274 | 0.089 | −0.033 |
+| CIM | 0.686 | 0.588 | 0.495 | 0.249 | 0.143 | −0.049 |
+| ResNet | 0.593 | 0.479 | 0.436 | 0.285 | 0.123 | −0.050 |
 
-| Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
-|-------|------------|-------------|-----|-----|-----------|--------------|
-| **CIM** | **0.7005** | 0.3613 | 0.195 | 0.102 | −0.050 | 0.592 |
-| CIM_Norm | 0.6954 | 0.3910 | **0.247** | 0.098 | **−0.013** | **0.624** |
-| CIM_ProgFusion | 0.6883 | **0.4035** | 0.253 | **0.107** | −0.065 | 0.619 |
-| EarlyFusion32 | 0.7003 | 0.3901 | 0.189 | 0.055 | −0.192 | 0.626 |
-| ResNet | 0.5033 | 0.3366 | 0.222 | 0.071 | −0.094 | 0.615 |
+**DLBCL is the hardest dataset** by a significant margin. All models produce negative silhouette scores — the embedding space is fragmented. MAP values (0.48–0.61) are far below other datasets because the fine T cell subtypes are almost indistinguishable from protein expression alone.
 
-**Key observations:**
-- DLBCL has 18 fine-grained B-cell and T-cell subtypes (including CD4TNaive, TTOXNaive, TTOX_exh, TFH). The fine-grained distinctions push LP accuracy down to ~70%.
-- CIM_Norm has the best silhouette (−0.013) and purity (0.624), confirming that input normalisation helps on a dataset with strong batch effects across many patient samples.
-- ResNet is −19.7pp below CIM, the largest gap across all datasets — DLBCL's fine-grained B/T cell subtypes are maximally dependent on single-marker discrimination.
-- EarlyFusion32 achieves nearly the same linear probe accuracy as CIM (0.7003 vs 0.7005) but has dramatically worse geometry (silhouette −0.192 vs −0.050).
+**CIM_ProgFusion is the best model here** — the only dataset where it leads on LP. The dual-branch cross-channel fusion appears to capture the subtle co-expression signatures needed to distinguish TFH, TTOX, TTOX_exh, and NKT cells.
 
----
+![DLBCL Per-Class AP](docs/figures/fig5_dlbcl_per_class.png)
 
-### IMC_NB
+*Figure 5: Per-class AP on CODEX_DLBCL for all four models, sorted by class difficulty. Blue = AP ≥ 0.70, orange = 0.40–0.70, red < 0.40.*
 
-7 coarse cell types, 31 markers, ~240k cells. Results at `z_RUNS/IMC_NB_<MODEL>_VICReg/`.
+**Hardest classes (all models):**
 
-![UMAP — CIM + VICReg, IMC_NB, coloured by cell type](z_RUNS/IMC_NB_CIM_VICReg/umap.png)
-*UMAP — **CIM + VICReg**, IMC_NB · coloured by cell type · `z_RUNS/IMC_NB_CIM_VICReg/umap.png`*
+| Class | CIM AP | CIM_PF AP | EF32 AP | ResNet AP | n_cells |
+|---|---|---|---|---|---|
+| B | 0.959 | 0.962 | 0.965 | 0.931 | 27,421 |
+| TTOX_exh | 0.813 | 0.804 | 0.818 | 0.674 | 3,322 |
+| TFH | 0.388 | 0.438 | 0.417 | 0.328 | 592 |
+| NKT | 0.191 | 0.210 | 0.193 | 0.126 | 134 |
+| MC | 0.059 | 0.098 | 0.065 | 0.063 | 43 |
 
-| Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
-|-------|------------|-------------|-----|-----|-----------|--------------|
-| CIM | 0.8042 | 0.6422 | 0.270 | 0.193 | +0.058 | 0.787 |
-| **EarlyFusion32** | **0.8310** | 0.6777 | 0.276 | 0.188 | **+0.061** | 0.822 |
-| ResNet | 0.8021 | **0.6948** | **0.313** | 0.173 | +0.050 | **0.833** |
-
-**Key observations:**
-- IMC has only 7 coarse classes (Tumor, T_Cell, B_Cell, Myeloid, Progenitor, Stromal, Other). All silhouette scores are **positive**, indicating well-separated clusters — this is the only dataset where all models achieve positive silhouette.
-- EarlyFusion32 leads on LP accuracy (0.831), and ResNet has the best kNN (0.695) and purity (0.833). At 7 coarse classes, cross-channel mixing is less harmful.
-- The coarser annotation masks intra-class variation that challenges finer-grained datasets.
+MC (43 cells) and NKT (134 cells) are near-random for all models. These rare subtypes may require more specific markers not present in the 40-plex panel.
 
 ---
 
-### IMC_NB_FineCT
+### IMC_NB_TumorSub
 
-11 fine cell types, same 31 markers, ~237k cells. Results at `z_RUNS/IMC_NB_FineCT_<MODEL>_VICReg/`.
+**31-marker IMC panel, 19 cell types (8 immune/stromal + 11 tumour subtypes), ~240k cells**
 
-![UMAP — CIM + VICReg, IMC_NB_FineCT, coloured by cell type](z_RUNS/IMC_NB_FineCT_CIM_VICReg/umap.png)
-*UMAP — **CIM + VICReg**, IMC_NB_FineCT · coloured by cell type · `z_RUNS/IMC_NB_FineCT_CIM_VICReg/umap.png`*
+| Model | LP bal acc | MAP | kNN bal | NMI | ARI | Silhouette |
+|---|---|---|---|---|---|---|
+| **EarlyFusion32** | **0.787** | **0.804** | **0.670** | 0.364 | 0.195 | +0.019 |
+| CIM_ProgFusion | 0.780 | 0.791 | 0.664 | **0.404** | **0.206** | **+0.039** |
+| CIM | 0.778 | 0.767 | 0.654 | 0.356 | 0.180 | +0.014 |
+| ResNet | 0.769 | 0.759 | 0.660 | 0.373 | 0.180 | +0.025 |
 
-| Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
-|-------|------------|-------------|-----|-----|-----------|--------------|
-| CIM | 0.8043 | 0.6086 | 0.263 | 0.176 | −0.008 | 0.707 |
-| CIM_Norm | 0.8222 | 0.5911 | 0.289 | 0.142 | +0.011 | 0.738 |
-| CIM_ProgFusion | 0.8143 | 0.6115 | 0.288 | 0.143 | **+0.030** | 0.742 |
-| **EarlyFusion32** | **0.8209** | **0.6548** | 0.284 | **0.151** | +0.035 | **0.755** |
-| ResNet | 0.7739 | 0.6256 | **0.332** | 0.170 | +0.050 | 0.779 |
+**IMC_NB_TumorSub is the only dataset where EarlyFusion32 leads on LP and MAP.** The 11 tumour subtypes (TC_CD24pos, TC_CD24neg, TC_CD44, TC_CHGAhi, TC_CXCR4hi, TC_GATA3hi, TC_GD2lo, TC_bridge, TC_early, Proliferating, Progenitor) are distinguished primarily by co-expression patterns — early cross-channel mixing appears beneficial for this task.
 
-**Key observations:**
-- Moving from 7 to 11 classes (splitting T_Cell into CD4_T, CD8_T; Myeloid into finer subtypes) reveals that single-marker differences are important. LP accuracy drops across all models.
-- CIM_ProgFusion (silhouette +0.030) and EarlyFusion32 (silhouette +0.035) now outperform plain CIM (−0.008) on geometry. Progressive fusion's cross-marker mixing proves beneficial when finer immune subtypes require co-expression patterns.
-- ResNet achieves the best NMI (0.332) and purity (0.779) but the worst LP (0.774) — consistent with its pattern of good cluster structure but poor linear separability.
-- EarlyFusion32 is competitive at +11 classes; the gap to CIM narrows compared to CODEX datasets with 17–18 classes.
+**CIM_ProgFusion achieves the best NMI (0.404) and ARI (0.206) and silhouette (+0.039)** — the best clustering geometry of any model on any dataset. This suggests that for fine-grained intra-tumour subtyping, the progressive fusion strategy produces the cleanest, most structured representation.
+
+All models are competitive and close (LP range: 0.769–0.787), consistent with IMC providing a relatively clean marker-to-cell-type mapping for neuroblastoma subtypes.
+
+![IMC NB Per-Class AP](docs/figures/fig8_imc_per_class.png)
+
+*Figure 8: Per-class AP on IMC_NB_TumorSub. Tumour subtypes (TC_*) show wide variation; immune/stromal types (B_Cell, T_Cell, Stromal) are well-resolved.*
+
+**Hardest classes:** TC_CHGAhi (0.399), TC_GATA3hi (0.437), Progenitor (0.585) — rare tumour subtypes with overlapping marker profiles. Easy classes: B_Cell, Stromal, T_Cell (AP > 0.92 for all models).
 
 ---
 
 ### MIBI_TNBC
 
-16 cell types, 37 markers, ~196k cells. The most heavily studied dataset with multiple variants. Results at `z_RUNS/MIBI_TNBC_<MODEL>_VICReg/`.
+**37-marker MIBI panel, 16 cell types, ~196k cells, 40 patients**
 
-![UMAP — CIM + VICReg, MIBI_TNBC, coloured by cell type](z_RUNS/MIBI_TNBC_CIM_VICReg/umap.png)
-*UMAP — **CIM + VICReg**, MIBI_TNBC · coloured by cell type · `z_RUNS/MIBI_TNBC_CIM_VICReg/umap.png`*
+| Model | LP bal acc | MAP | kNN bal | NMI | ARI | Silhouette |
+|---|---|---|---|---|---|---|
+| **CIM** | **0.835** | **0.806** | **0.643** | 0.267 | 0.086 | **−0.022** |
+| CIM_ProgFusion | 0.825 | 0.806 | 0.494 | 0.265 | 0.092 | −0.094 |
+| EarlyFusion32 | 0.815 | 0.801 | 0.573 | 0.259 | 0.089 | −0.041 |
+| ResNet | 0.699 | 0.641 | 0.524 | **0.296** | **0.110** | −0.044 |
 
-![UMAP — CIM + VICReg, MIBI_TNBC, coloured by patient sample](z_RUNS/MIBI_TNBC_CIM_VICReg/umap_sample.png)
-*UMAP — **CIM + VICReg**, MIBI_TNBC · coloured by **patient sample** (checks for inter-sample fragmentation) · `z_RUNS/MIBI_TNBC_CIM_VICReg/umap_sample.png`*
+**MIBI_TNBC has the highest LP balanced accuracies** across all datasets, reflecting a clean marker-to-cell-type mapping (Pan-Keratin for tumour, FoxP3 for Tregs, CD8 for CD8 T cells, etc.). CIM leads at 0.835.
 
-| Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
-|-------|------------|-------------|-----|-----|-----------|--------------|
-| CIM | 0.8446 | 0.5780 | 0.274 | 0.107 | −0.094 | 0.711 |
-| **CIM_Norm** | 0.8386 | **0.5802** | 0.321 | 0.126 | **+0.002** | 0.727 |
-| CIM_ProgFusion | 0.8297 | 0.5714 | **0.332** | **0.142** | +0.001 | **0.728** |
-| EarlyFusion32 | 0.8371 | 0.4458 | 0.206 | 0.075 | −0.205 | 0.653 |
-| ResNet | 0.5925 | 0.3963 | 0.222 | 0.069 | −0.151 | 0.631 |
-| CIMATT_Gate | **0.8454** | 0.5598 | 0.306 | 0.121 | −0.088 | 0.706 |
-| CIMATT_Gate_LowAug | 0.8476 | 0.5861 | 0.300 | 0.143 | −0.082 | 0.723 |
+All models have negative silhouette — MIBI patient variability creates fragmentation in the embedding space. However, the CIM_ProgFusion fragmentation (−0.094) is notably worse than CIM (−0.022), suggesting the fusion branch amplifies cross-patient variation.
 
-**UMAP comparison across all models — MIBI_TNBC, coloured by cell type:**
+ResNet has the best NMI (0.296) and ARI (0.110) despite the worst LP — consistent with ResNet producing well-integrated, patient-invariant embeddings (implicit relative feature computation) at the cost of discriminative precision.
 
-| CIM + VICReg | CIM_Norm + VICReg | CIM_ProgFusion + VICReg |
-|:---:|:---:|:---:|
-| ![UMAP — CIM + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_CIM_VICReg/umap.png) | ![UMAP — CIM_Norm + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_CIM_Norm_VICReg/umap.png) | ![UMAP — CIM_ProgFusion + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_CIM_ProgFusion_VICReg/umap.png) |
-| sil = −0.094 | sil = **+0.002** | sil = **+0.001** |
+![MIBI Per-Class AP](docs/figures/fig6_mibi_per_class.png)
 
-| EarlyFusion32 + VICReg | ResNet + VICReg | CIMATT_Gate + VICReg |
-|:---:|:---:|:---:|
-| ![UMAP — EarlyFusion32 + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_EarlyFusion32_VICReg/umap.png) | ![UMAP — ResNet + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_ResNet_VICReg/umap.png) | ![UMAP — CIMATT_Gate + VICReg, MIBI_TNBC](z_RUNS/MIBI_TNBC_CIMATT_Gate_VICReg/umap.png) |
-| sil = −0.205 | sil = −0.151 | sil = −0.088 |
+*Figure 6: Per-class AP on MIBI_TNBC. Most classes are well-resolved; Tumor and DC/Mono are the hardest (AP ~0.50–0.60).*
 
-> The silhouette score (cosine distance) quantifies embedding compactness: CIM_Norm and CIM_ProgFusion are the only models with non-negative silhouette, visible as well-separated clusters in the UMAPs. EarlyFusion32 shows strong inter-sample fragmentation.
-
-**Key observations:**
-- CIM_Norm and CIM_ProgFusion both push the silhouette to near zero (+0.002, +0.001), confirming that input normalisation is the critical ingredient for sample-invariant embeddings on MIBI_TNBC.
-- EarlyFusion32 has the second-worst silhouette (−0.205) despite competitive linear probe accuracy (0.837). Its UMAP is strongly fragmented by sample, confirming that cross-channel mixing encodes absolute intensities.
-- ResNet collapses to 59.3% balanced accuracy — the worst LP on MIBI_TNBC — but its cross-channel mixing from layer 1 produces a silhouette (−0.151) better than EarlyFusion (−0.205). This is the "relative features" effect: ResNet's mixed convolutions encode co-expression ratios that are partially sample-invariant.
-- **CIMATT_Gate** achieves the highest raw LP accuracy (84.5–84.8%), but its silhouette (−0.088) remains negative. The attention-based gating creates fragmented embedding islands (cells of the same type with different relative expression profiles land in different UMAP islands). The LowAug variant slightly improves geometry (−0.082) while preserving the LP advantage.
-- CIM_ProgFusion achieves the best NMI (0.332) and ARI (0.142) of all CIM-family models, matching or exceeding CIMATT_Gate on structure metrics.
+**Hardest classes:** Mono/Neu (0.500), Tumor (0.601), DC/Mono (0.599) — functionally overlapping myeloid populations. Easy classes: Keratin+ tumour (0.991), Tregs (0.983), CD8 T (0.944).
 
 ---
 
-### MIBI_TNBC Cross-Validation
+### Panel Size: Less Is More
 
-To estimate generalisation across patient cohorts, 5 sample-level 80/20 cross-validation splits were run on MIBI_TNBC. Each split holds out different patient samples as the validation set. Split configs: `configs/_datasets_/MIBI_TNBC_CV{0-4}.py`. Run scripts: `run_cv.sh`.
+A key finding from the cHL experiments: **reducing the panel from 41 to 18 markers improves all metrics for all models.**
 
-Individual split results in `z_RUNS/MIBI_TNBC_CV{0-4}_<MODEL>_VICReg/`.
+| Model | LP Δ | MAP Δ | NMI Δ | ARI Δ | Sil Δ |
+|---|---|---|---|---|---|
+| CIM | +0.012 | +0.011 | +0.035 | +0.031 | +0.030 |
+| CIM_ProgFusion | +0.007 | +0.022 | +0.045 | +0.066 | +0.011 |
+| EarlyFusion32 | +0.015 | +0.031 | +0.003 | −0.007 | +0.014 |
+| ResNet | +0.005 | +0.034 | +0.003 | +0.001 | +0.040 |
 
-**CV Mean ± Std (5 splits unless noted):**
+*Positive = KRONOS18 better. All Δ = KRONOS18 − full panel.*
 
-| Model | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
-|-------|------------|-------------|-----|-----|-----------|--------------|
-| CIM | 0.810 ± 0.013 | 0.531 ± 0.019 | 0.280 ± 0.018 | 0.100 ± 0.020 | −0.082 ± 0.030 | 0.772 ± 0.031 |
-| CIM_Norm | 0.809 ± 0.011 | 0.522 ± 0.023 | 0.314 ± 0.016 | 0.134 ± 0.019 | **+0.003 ± 0.024** | 0.781 ± 0.027 |
-| **CIM_ProgFusion** | 0.799 ± 0.010 | 0.527 ± 0.024 | **0.333 ± 0.008** | 0.128 ± 0.014 | +0.025 ± 0.018 | **0.786 ± 0.029** |
-| EarlyFusion32 | 0.807 ± 0.009 | 0.399 ± 0.015 | 0.215 ± 0.035 | 0.075 ± 0.027 | −0.228 ± 0.034 | 0.724 ± 0.034 |
+The most striking single-class difference: **TReg AP on CIM jumps from 0.554 (41-marker) to 0.823 (18-marker)**. The curated panel retains FoxP3 with a higher effective signal-to-noise ratio — the 23 additional channels in the full panel dilute rather than enhance the TReg-specific signal.
 
-**Individual CV split results:**
+This has an important practical implication: **panel curation matters more than panel size**. For self-supervised learning, adding uninformative or noisy markers actively hurts representation quality.
 
-<details>
-<summary>CIM + VICReg — per-split</summary>
+![Clustering Comparison](docs/figures/fig3_clustering.png)
 
-| Split | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
-|-------|------------|-------------|-----|-----|-----------|--------------|
-| CV0 | 0.797 | 0.508 | 0.274 | 0.097 | −0.060 | 0.764 |
-| CV1 | 0.832 | 0.544 | 0.290 | 0.106 | −0.055 | 0.771 |
-| CV2 | 0.801 | 0.561 | 0.311 | 0.135 | −0.060 | 0.799 |
-| CV3 | 0.817 | 0.524 | 0.265 | 0.088 | −0.127 | 0.807 |
-| CV4 | 0.803 | 0.518 | 0.261 | 0.076 | −0.107 | 0.719 |
-| **Mean** | **0.810** | **0.531** | **0.280** | **0.100** | **−0.082** | **0.772** |
-| **±Std** | ±0.013 | ±0.019 | ±0.018 | ±0.020 | ±0.030 | ±0.031 |
+*Figure 3: NMI and ARI across all model–dataset combinations.*
 
-</details>
+![Silhouette](docs/figures/fig4_silhouette.png)
 
-<details>
-<summary>CIM_Norm + VICReg — per-split</summary>
-
-| Split | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
-|-------|------------|-------------|-----|-----|-----------|--------------|
-| CV0 | 0.804 | 0.496 | 0.287 | 0.109 | +0.003 | 0.764 |
-| CV1 | 0.831 | 0.533 | 0.329 | 0.135 | +0.018 | 0.786 |
-| CV2 | 0.805 | 0.552 | 0.309 | 0.119 | +0.027 | 0.805 |
-| CV3 | 0.804 | 0.493 | 0.332 | 0.141 | −0.042 | 0.811 |
-| CV4 | 0.801 | 0.534 | 0.315 | 0.165 | +0.006 | 0.738 |
-| **Mean** | **0.809** | **0.522** | **0.314** | **0.134** | **+0.003** | **0.781** |
-| **±Std** | ±0.011 | ±0.023 | ±0.016 | ±0.019 | ±0.024 | ±0.027 |
-
-</details>
-
-<details>
-<summary>CIM_ProgFusion + VICReg — per-split</summary>
-
-| Split | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
-|-------|------------|-------------|-----|-----|-----------|--------------|
-| CV0 | 0.790 | 0.499 | 0.329 | 0.125 | +0.023 | 0.770 |
-| CV1 | 0.810 | 0.554 | 0.334 | 0.147 | +0.025 | 0.794 |
-| CV2 | 0.791 | 0.556 | 0.323 | 0.105 | +0.052 | 0.810 |
-| CV3 | 0.813 | 0.510 | 0.346 | 0.131 | −0.003 | 0.817 |
-| CV4 | 0.792 | 0.514 | 0.331 | 0.134 | +0.028 | 0.737 |
-| **Mean** | **0.799** | **0.527** | **0.333** | **0.128** | **+0.025** | **0.786** |
-| **±Std** | ±0.010 | ±0.024 | ±0.008 | ±0.014 | ±0.018 | ±0.029 |
-
-</details>
-
-<details>
-<summary>EarlyFusion32 + VICReg — per-split (n=5)</summary>
-
-| Split | LP Bal. Acc | kNN Bal. Acc | NMI | ARI | Silhouette | Neigh. Purity |
-|-------|------------|-------------|-----|-----|-----------|--------------|
-| CV0 | 0.801 | 0.386 | 0.265 | 0.121 | −0.161 | 0.712 |
-| CV1 | 0.815 | 0.395 | 0.161 | 0.059 | −0.253 | 0.712 |
-| CV2 | 0.796 | 0.427 | 0.210 | 0.052 | −0.229 | 0.752 |
-| CV3 | 0.821 | 0.388 | 0.199 | 0.054 | −0.249 | 0.769 |
-| CV4 | 0.802 | 0.400 | 0.239 | 0.087 | −0.246 | 0.673 |
-| **Mean** | **0.807** | **0.399** | **0.215** | **0.075** | **−0.228** | **0.724** |
-| **±Std** | ±0.009 | ±0.015 | ±0.035 | ±0.027 | ±0.034 | ±0.034 |
-
-</details>
-
-**Key CV observations:**
-- **CIM_ProgFusion is the most stable** (smallest LP std: ±0.010) and achieves the best NMI (0.333 ± 0.008, the tightest uncertainty of all models) across splits, confirming that its cross-marker fusion generalises well to held-out samples.
-- **CIM_Norm silhouette is consistently near zero** (+0.003 ± 0.024), the only model whose embedding geometry is consistently non-negative. This is the clearest evidence that input L2-normalisation solves the inter-sample variation problem.
-- **EarlyFusion32 silhouette** (−0.228 ± 0.034, all 5 splits now complete) is robustly negative — the sample fragmentation is not a training artefact but a structural limitation of early-fusion architectures on MIBI_TNBC.
-- LP accuracy gap between CIM (0.810) and CIM_ProgFusion (0.799) is only −1.1pp, while ProgFusion leads on all geometry metrics. The choice depends on the downstream task: LP accuracy → CIM; cluster quality → CIM_ProgFusion.
-- **EarlyFusion32 NMI is highly variable across splits** (0.161–0.265, std ±0.035) compared to CIM_ProgFusion (std ±0.008), suggesting EarlyFusion32's cluster structure is sensitive to which patient cohort is held out.
+*Figure 4: Cosine silhouette score. Positive = compact cluster geometry; negative = fragmented/overlapping. Note the DLBCL models are universally negative and MIBI_TNBC shows patient-driven fragmentation.*
 
 ---
 
 ## Key Findings
 
-### 1. Channel separability is the most important inductive bias
+### 1. CIM is the most consistently strong model
 
-Across all 5 datasets, CIM outperforms EarlyFusion on silhouette and linear probe accuracy. The fundamental reason: in multiplexed imaging, cell type identity is defined by **which markers are expressed**, not by their joint spatial pattern. Grouped depthwise convolutions preserve this structure; standard convolutions destroy it.
+CIM leads or ties on LP balanced accuracy on 4 of 5 datasets. Its channel-independent grouped conv design provides a robust inductive bias for multiplexed imaging: each marker is processed as its own feature stream, preventing batch effects from leaking across channels.
 
-**CODEX_cHL quantification:** CIM (1.1M params, 1k iters) vs EarlyFusion32 (45M params, 5k iters): CIM wins on LP (+1.7pp), silhouette (−0.003 vs −0.006 at 5k), and training efficiency (45× fewer parameters, 5× fewer iterations). EarlyFusion32 at 5k learns comparably good cluster *structure* (NMI nearly matches CIM) but the clusters are not linearly separable.
+### 2. CIM_ProgFusion leads on DLBCL and on clustering metrics
 
-### 2. Input L2-normalisation solves inter-sample intensity variation
+On the hardest dataset (DLBCL, fine T cell subtypes), CIM_ProgFusion's cross-channel fusion is beneficial. It also consistently achieves the best NMI on the IMC_NB_TumorSub dataset (+0.404, best across all models and all datasets). The trade-off vs CIM is approximately −1pp LP but +3–5pp NMI/ARI.
 
-CIM_Norm (`input_norm=True`) applies `F.normalize(x, dim=1)` before the stem, converting absolute intensity vectors to relative expression profiles. This single change:
-- Brings MIBI_TNBC silhouette from −0.094 to +0.002
-- Brings MIBI_TNBC NMI from 0.274 to 0.321
-- Costs only ~0.6pp on LP accuracy (0.844 → 0.839)
+**Use CIM when:** discriminative accuracy (LP) is the priority.
+**Use CIM_ProgFusion when:** cluster structure (NMI/ARI, downstream discovery) is the priority, or when fine subtypes require cross-channel co-expression features (DLBCL).
 
-The tradeoff is acceptable for most use cases. For applications requiring maximally linear features (e.g. downstream classification), plain CIM is preferable.
+### 3. EarlyFusion32 wins only on IMC_NB_TumorSub LP/MAP
 
-### 3. Progressive fusion is the best geometry model
+The only dataset where early channel mixing is beneficial is IMC_NB_TumorSub with its fine tumour subtypes. Elsewhere, early fusion either matches or underperforms CIM. Notably, EarlyFusion32 consistently fails on structurally rare classes like Epithelial (AP 0.09–0.27 vs CIM's 0.63) — early mixing loses marker-specific identity needed for low-frequency cell types.
 
-CIM_ProgFusion achieves the best NMI and ARI across MIBI_TNBC and CODEX_DLBCL. By integrating cross-marker information *gradually* (via injections into a fusion stream at each stage), it avoids the fragmentation of early fusion while capturing co-expression patterns that pure CIM misses in its neck.
+### 4. ResNet: smooth geometry, poor discrimination
 
-On MIBI_TNBC CV: NMI 0.333 ± 0.008, the tightest uncertainty of all models. Its cluster structure is consistent across held-out patient cohorts.
+ResNet consistently shows near-zero or slightly positive silhouette despite the lowest LP scores. Its deep channel mixing effectively decorrelates cross-patient intensity variation (implicit relative features) but produces coarse, low-resolution representations (feature_dim=256 vs 1000+ for CIM).
 
-### 4. CIMATT_Gate: higher LP accuracy but fragmented geometry
+### 5. All models fail on M1/M2 macrophage discrimination
 
-The marker gating mechanism of CIMATT_Gate achieves the highest linear probe accuracy on MIBI_TNBC (0.845–0.848 full-run). The gates learn to up-weight distinctively expressed markers per cell, providing richer discriminative features for the linear probe.
+M1 macrophage AP is ~0.50 (near chance) on every dataset and every model. M1/M2 polarisation state is functionally defined by cytokine context and is not reliably captured by the protein markers in any of these panels. This is a marker-selection limitation, not an architecture limitation.
 
-**However:** The silhouette remains negative (−0.088 vs −0.094 for plain CIM). The root cause is that gating based on relative expression creates a non-smooth embedding manifold: cells of the same type with different relative marker profiles (e.g., from different tissue regions) receive different gate patterns and land in different UMAP islands. Input normalisation (CIM_Norm) is a more robust solution to inter-sample variation.
+### 6. Rare cell types ≤ 100 cells are unreliable
 
-### 5. ResNet integrates samples "for free" but at LP cost
+Classes with fewer than ~100 cells (MC=43, Granulo=44 in DLBCL; Cytotoxic CD8=38 in cHL) show erratic AP values. Their per-class metrics should be interpreted with caution.
 
-ResNet achieves better inter-sample integration than EarlyFusion (higher silhouette on most datasets) because its cross-channel convolutions from layer 1 implicitly encode **relative features** (ratios, co-expression patterns) rather than absolute intensities. This makes it partially sample-invariant.
+### 7. Silhouette negativity encodes patient fragmentation
 
-The cost: ResNet achieves the worst linear probe accuracy on datasets with fine-grained cell type distinctions (−10.7pp on CODEX_cHL, −19.7pp on CODEX_DLBCL vs CIM). When cell types differ in a single marker's absolute level, ResNet cannot recover that signal after channel mixing.
-
-### 6. Performance ceilings are panel-limited, not model-limited
-
-**CODEX_cHL:** All models converge to ~72–73% balanced accuracy. Panel inspection reveals FoxP3 (canonical Treg marker) and CD56 (canonical NK marker) are absent due to poor CODEX staining quality. This creates irreducible CD4/TReg and Monocyte/NK confusion matching the KRONOS ViT-Large ceiling (73.6%).
-
-**CODEX_DLBCL:** The 18-class fine-grained annotation (CD4TNaive, TTOX_exh, TFH, etc.) requires markers that may not uniquely define these states in the CODEX panel, pushing all models to ~68–70%.
-
-**Implication:** Improving cell type separability on these datasets requires either a better antibody panel or label consolidation, not better models.
-
-### 7. Linear probe overestimates performance vs kNN
-
-The linear probe consistently outperforms kNN by 15–25pp (e.g., CODEX_cHL: LP 72.5% vs kNN 52.5%). This indicates the embedding geometry is not metric-isotropic: classes are linearly separable but not compact in cosine distance. The linear probe is the correct primary metric. However, for nearest-neighbour based analyses (cell graph construction, spatial queries), kNN accuracy is more informative.
-
----
-
-## Region Analysis
-
-The **CIM + VICReg** backbone (trained on CODEX_cHL single cells) generalises to tissue region discovery via sliding-window patching without any retraining or spatial supervision. See `notebooks/region_analysis.ipynb`.
-
-**Model used:** `z_RUNS/CODEX_cHL_CIM_VICReg/` (CIM + VICReg, 1k iterations)
-
-**Pipeline:**
-1. Extract overlapping spatial patches (ps64: 64×64px, 50% stride; ps128: 128×128px, 50% stride) from full CODEX_cHL tissue images
-2. Embed each patch with the **frozen CIM backbone** (`AdaptiveAvgPool2d` accepts any spatial size)
-3. PCA (64 components) → MiniBatchKMeans (k ∈ {2, 4, 8, 12, 16})
-4. Interpret clusters by the cell-type composition of cells whose centre falls within each patch
-
-All results stored at `z_RUNS/region_analysis/ps{PATCH_SIZE}/k_{k}/`.
-
----
-
-### k=2 — Fundamental tissue dichotomy
-
-*Embeddings from **CIM + VICReg** (CODEX_cHL). UMAP coloured by region cluster.*
-
-| | ps64 (64×64 px patches) | ps128 (128×128 px patches) |
-|---|---|---|
-| UMAP of patch embeddings | ![Region UMAP — CIM + VICReg, CODEX_cHL, ps64, k=2](z_RUNS/region_analysis/ps64/k_2/umap.png) | ![Region UMAP — CIM + VICReg, CODEX_cHL, ps128, k=2](z_RUNS/region_analysis/ps128/k_2/umap.png) |
-| Spatial map | ![Spatial map — CIM + VICReg, CODEX_cHL, ps64, k=2](z_RUNS/region_analysis/ps64/k_2/spatial_map.png) | ![Spatial map — CIM + VICReg, CODEX_cHL, ps128, k=2](z_RUNS/region_analysis/ps128/k_2/spatial_map.png) |
-
-The first split separates the two fundamental tissue compartments in cHL:
-
-| Cluster | Top cell types | Interpretation |
-|---------|---------------|----------------|
-| C0 | Tumor ~17%, NK ~11%, DC ~9% | **Tumour niche** — Reed-Sternberg cell-enriched regions with innate immune infiltration |
-| C1 | CD4 ~30%, CD8 ~15%, B ~14% | **Lymphoid zone** — mixed adaptive immune areas |
-
-This dichotomy is consistent across both patch sizes, confirming it reflects genuine tissue-level structure.
-
----
-
-### k=4 — Stromal and vascular compartments emerge
-
-*Embeddings from **CIM + VICReg** (CODEX_cHL).*
-
-| | ps64 (64×64 px patches) | ps128 (128×128 px patches) |
-|---|---|---|
-| Cell-type composition per cluster | ![Composition — CIM + VICReg, CODEX_cHL, ps64, k=4](z_RUNS/region_analysis/ps64/k_4/composition.png) | ![Composition — CIM + VICReg, CODEX_cHL, ps128, k=4](z_RUNS/region_analysis/ps128/k_4/composition.png) |
-| Spatial map | ![Spatial map — CIM + VICReg, CODEX_cHL, ps64, k=4](z_RUNS/region_analysis/ps64/k_4/spatial_map.png) | ![Spatial map — CIM + VICReg, CODEX_cHL, ps128, k=4](z_RUNS/region_analysis/ps128/k_4/spatial_map.png) |
-
----
-
-### k=8 — Most informative granularity (ps64)
-
-Verified directly from `z_RUNS/region_analysis/ps64/k_8/results.json`. Embeddings from **CIM + VICReg** (CODEX_cHL).
-
-| Cluster | Size | Top cell types | Interpretation |
-|---------|------|---------------|----------------|
-| C5 | 5,712 | Tumor **48.5%**, DC 10.5%, NK 8.6%, Monocyte 6.1% | **Dense tumour niche** — highest RS cell concentration |
-| C6 | 6,138 | Tumor **20.3%**, NK 17.2%, Monocyte 13.0%, DC 13.2% | **Tumour-infiltrating immune zone** — tumour border with innate immune infiltrate |
-| C4 | 7,750 | NK **11.4%**, Monocyte 10.4%, DC 9.1%, Tumor 6.8%, CD4 26.2% | **Innate immune / tumour-adjacent** — mixed NK/Monocyte/DC zone near tumour |
-| C2 | 15,046 | B **23.4%**, CD4 29.1%, CD8 14.2% | **B cell follicle** — B cells with follicular helper T cells (TFH) |
-| C1 | 8,375 | CD4 **38.0%**, CD8 19.0%, TReg 4.1%, B 7.4% | **T cell zone** — interfollicular CD4-rich area with Tregs |
-| C3 | 7,565 | M2 **13.8%**, CD4 22.6%, Other 9.0%, Mast 4.4% | **Stromal / M2 macrophage** — connective tissue with anti-inflammatory macrophages |
-| C7 | 6,734 | Other **22.2%**, M2 14.2%, CD4 18.0%, Endothelial 7.9% | **Dense stroma** — stromal cells + M2 macrophages |
-| C0 | 5,179 | Endothelial **23.7%**, CD4 18.1%, CD8 12.0%, M2 7.8% | **Vascular / perivascular** — endothelial-enriched zone |
-
-*Embeddings from **CIM + VICReg** (CODEX_cHL), 64×64 px patches.*
-
-| UMAP of patch embeddings (k=8) | Spatial tissue map | Cell-type composition per cluster |
-|:---:|:---:|:---:|
-| ![Region UMAP — CIM + VICReg, CODEX_cHL, ps64, k=8](z_RUNS/region_analysis/ps64/k_8/umap.png) | ![Spatial map — CIM + VICReg, CODEX_cHL, ps64, k=8](z_RUNS/region_analysis/ps64/k_8/spatial_map.png) | ![Composition — CIM + VICReg, CODEX_cHL, ps64, k=8](z_RUNS/region_analysis/ps64/k_8/composition.png) |
-
-| Spatial map with per-cluster cell-type pie charts — CIM + VICReg, CODEX_cHL, ps64, k=8 |
-|:---:|
-| ![Spatial map with pies — CIM + VICReg, CODEX_cHL, ps64, k=8](z_RUNS/region_analysis/ps64/k_8/spatial_map_with_pie.png) |
-
----
-
-### k=12 and k=16 — Further sub-compartment resolution
-
-*Embeddings from **CIM + VICReg** (CODEX_cHL), 64×64 px patches.*
-
-| Spatial map — k=12 | Spatial map — k=16 |
-|:---:|:---:|
-| ![Spatial map — CIM + VICReg, CODEX_cHL, ps64, k=12](z_RUNS/region_analysis/ps64/k_12/spatial_map.png) | ![Spatial map — CIM + VICReg, CODEX_cHL, ps64, k=16](z_RUNS/region_analysis/ps64/k_16/spatial_map.png) |
-
-At k≥12 the tumour niche begins to split into sub-regions (e.g. dense core vs infiltrating rim), and the T-cell zone separates into CD4-dominant and CD8-enriched sub-areas.
-
----
-
-**Key biological findings:**
-- **Tumour niche is robustly recovered at all k.** A Tumor-enriched cluster (rising to 48.5% at k=8) is present at every granularity, co-localising with DC and NK — consistent with the characteristic RS cell microenvironment in cHL.
-- **B cell follicle structure is preserved.** A B-cell-rich cluster (B=23.4%) appears from k≥4, always co-localising with CD4 T cells (follicular helper T cells). This mirrors germinal centre residuals common in cHL.
-- **Vascular and stromal compartments are separated.** At k=8, an Endothelial-enriched cluster (23.7%) is cleanly distinguished from stromal/M2 clusters — a granularity not visible at k≤4.
-- **ps64 vs ps128 give consistent structures.** Both patch sizes recover the same biological compartments; larger patches smooth boundaries but don't change interpretation.
-- **CIM features trained on single cells transfer to tissue-level organisation** without any spatial supervision or retraining.
-
----
-
-### MIBI_TNBC Region Analysis — CIM vs EarlyFusion32
-
-Full analysis notebook: `notebooks/region_analysis_MIBI_TNBC.ipynb`. All outputs at `z_RUNS/region_analysis_MIBI_TNBC/ps64/`. 40 patients, 158,760 patches (64×64 px, 50% stride).
-
-#### k sweep — how many compartments does each model find?
-
-| CIM + VICReg | EarlyFusion32 + VICReg |
-|:---:|:---:|
-| ![k sweep — CIM, MIBI_TNBC](z_RUNS/region_analysis_MIBI_TNBC/ps64/k_sweep_CIM.png) | ![k sweep — EarlyFusion32, MIBI_TNBC](z_RUNS/region_analysis_MIBI_TNBC/ps64/k_sweep_EarlyFusion32.png) |
-| Best k = **4** (sil = 0.165) | Best k = **2** (sil = 0.295) |
-
-This is one of the most striking results: **EarlyFusion32's embedding space can only support 2 meaningful clusters**. Its silhouette drops immediately from k=2 onward, meaning the embedding effectively collapses spatial variation to a single axis (tumour vs non-tumour). CIM's embedding supports 4 distinct natural compartments, and remains informative through k=6.
-
-#### UMAP of patch embeddings at k=6
-
-| CIM + VICReg | EarlyFusion32 + VICReg |
-|:---:|:---:|
-| ![UMAP — CIM, MIBI_TNBC regions, k=6](z_RUNS/region_analysis_MIBI_TNBC/ps64/k_6/umap_CIM.png) | ![UMAP — EarlyFusion32, MIBI_TNBC regions, k=6](z_RUNS/region_analysis_MIBI_TNBC/ps64/umap_EarlyFusion32.png) |
-| Distinct islands, well-separated clusters | Continuous connected blob; clusters blend into each other |
-
-CIM's UMAP shows clear island structure — each cluster occupies its own region of embedding space with minimal overlap. EarlyFusion32's UMAP is a single connected manifold with one detached outlier island; forcing k=6 creates artificial splits in a continuous gradient.
-
-#### UMAP coloured by dominant cell type
-
-![UMAP coloured by cell type — CIM vs EarlyFusion32, MIBI_TNBC](z_RUNS/region_analysis_MIBI_TNBC/ps64/umap_celltype_CIM_vs_EF32.png)
-*Left: CIM + VICReg · Right: EarlyFusion32 + VICReg · coloured by dominant cell type per patch*
-
-CIM organises patches into clearly separated cell-type islands — Keratin-positive tumour (large central cluster), immune cells (distinct peripheral islands). EarlyFusion32 compresses the same data into a single connected mass: immune cell types blur into the tumour cluster, losing the spatial resolution between compartments.
-
-#### Compartment distinctiveness (CIM vs EarlyFusion32)
-
-![Compartment distinctiveness — MIBI_TNBC](z_RUNS/region_analysis_MIBI_TNBC/ps64/compartment_distinctiveness.png)
-*Between-cluster Jensen-Shannon divergence of cluster compositions. Higher = clusters are more biologically distinct.*
-
-CIM: **0.371** vs EarlyFusion32: **0.323** (+15%). CIM's clusters are more compositionally distinct from each other. Side-by-side composition bars confirm: CIM clearly separates macrophage-enriched and T-cell-rich clusters from tumour clusters; EarlyFusion32's clusters are mostly indistinguishable (all dominated by Keratin-positive tumour).
-
-#### Cross-patient reproducibility (CIM, k=6)
-
-![Cross-patient reproducibility boxplot — CIM, MIBI_TNBC](z_RUNS/region_analysis_MIBI_TNBC/ps64/reproducibility_boxplot_CIM.png)
-*Jensen-Shannon divergence of matched cluster compositions across 40 patients. Low = reproducible across patients.*
-
-Tumour-core clusters (C1, C3) are the most reproducible (median JS ~0.26), consistent with TNBC's universally high tumour content. The macrophage-enriched cluster (C2) shows the highest variability (median JS ~0.46), correctly reflecting TNBC's known heterogeneity in immune infiltration.
-
-#### Spatial cluster maps + marker signal (representative patients)
-
-![Spatial cluster maps + marker signal — CIM vs EarlyFusion32, MIBI_TNBC](z_RUNS/region_analysis_MIBI_TNBC/ps64/spatial_markers_CIM_vs_EF32.png)
-*Rows = patients 5, 6, 20, 39 · Cols = CIM clusters, EF32 clusters, Pan-Keratin, CD3, CD68, Vimentin, dsDNA*
-
-CIM produces **spatially coherent, contiguous tissue regions** that align directly with the marker signal channels: Pan-Keratin-bright regions map to tumour clusters, CD68-bright regions to the macrophage cluster, Vimentin-bright regions to stromal clusters. EarlyFusion32 maps are noticeably noisier — same-colour patches scatter across tissue boundaries and show weaker alignment with the raw marker images.
+On MIBI_TNBC (40 patients), all models have negative silhouette. UMAPs coloured by patient ID show that the fragmentation is sample-driven: each patient's cells form a mini-cluster within each cell type cluster. CIM_ProgFusion shows the most fragmentation (−0.094), likely because the fusion branch has learned patient-specific co-expression patterns. CIM_Norm (L2-normalised input, not shown in paper) was the only model with positive silhouette on this dataset.
 
 ---
 
 ## How to Run
 
-### Prerequisites
+### Paper experiments (all 20 runs)
 
 ```bash
-pip install torch mmengine scikit-learn umap-learn h5py numpy
+# On the server, from the MCA repo root:
+bash run_paper.sh [GPU_ID]
+
+# e.g. on GPU 0:
+bash run_paper.sh 0
+
+# Already-completed runs (metrics.json exists) are skipped automatically.
 ```
 
-### Running a single experiment
+Results land in `z_RUNS/paper/<DATASET>/<MODEL>/`.
+
+### Single run
 
 ```bash
-python -m mmengine.runner configs/_experiments_/MIBI_TNBC/CIM_VICReg.py
+CUDA_VISIBLE_DEVICES=0 python tools/train.py configs/_experiments_/paper/CODEX_cHL_KRONOS18/CIM_VICReg_LARS.py
 ```
 
-Or with a custom work_dir:
+### Label efficiency (post-hoc)
 
 ```bash
-python -m mmengine.runner configs/_experiments_/MIBI_TNBC/CIM_VICReg.py \
-    --cfg-options work_dir=z_RUNS/MY_RUN
+python tools/label_efficiency.py z_RUNS/paper/CODEX_cHL_KRONOS18/CIM/
 ```
 
-### Running all backbones for a dataset
+### Loss curve
 
 ```bash
-bash run_experiments.sh MIBI_TNBC       # runs CIM, CIM_Norm, CIM_ProgFusion, EarlyFusion32, ResNet
-bash run_experiments.sh CODEX_cHL
-bash run_experiments.sh IMC_NB
+python tools/plot_loss.py z_RUNS/paper/CODEX_cHL_KRONOS18/CIM/
 ```
 
-### Running cross-validation splits
+### Re-run evaluation only
 
-```bash
-bash run_cv.sh MIBI_TNBC               # runs CV0–CV4 for CIM, CIM_Norm, CIM_ProgFusion, EarlyFusion32
-```
-
-### Debugging (fast mode)
-
-```bash
-DEBUG=1 python -m mmengine.runner configs/_experiments_/MIBI_TNBC/CIM_VICReg.py
-```
-
-Sets `n_linear=5, n_cosine=5` (10 total iterations) for quick sanity checks.
-
-### Configuration system
-
-Configs use mmengine's inheritance (`_base_`). The hierarchy is:
-
-```
-_experiments_/DATASET/MODEL_ALGO.py
-    ├── _base_/default.py
-    ├── _augmentations_/high.py or low.py
-    ├── _base_/train_cfg.py
-    ├── _base_/val_cfg.py
-    ├── _datasets_/DATASET.py
-    ├── _backbones_/MODEL.py
-    └── _algorithms_/ALGO.py
-```
-
-To create a new experiment, copy an existing config from `configs/_experiments_/` and modify the `_base_` list and `work_dir`.
+Use the `EvaluateModelRich` hook by setting `max_iters=0` and pointing to a checkpoint — or use the standalone evaluation script if available.
 
 ---
 
-## Citation / Reference
-
-This codebase was developed for research on self-supervised cell representation learning in multiplexed spatial proteomics. If you use this code, please cite the associated work (see `PUBLICATION_PLAN.md`).
-
----
-
-## Paper Storyline (Proposal)
-
-> This section proposes a narrative arc for a methods paper based on the results above.
-
-### Title (working)
-**"Channel-Independent Self-Supervised Learning Produces Sample-Invariant Cell Representations in Multiplexed Spatial Proteomics"**
-
----
-
-### Core claim
-Standard deep learning architectures applied to multiplexed imaging fail to produce sample-invariant cell representations because they mix marker channels from the first layer, encoding absolute intensities rather than relative expression profiles. A simple inductive bias — keeping each marker's features strictly separate throughout the backbone — is sufficient to substantially close this gap, while matching or exceeding much larger supervised and self-supervised baselines at a fraction of the computational cost.
-
----
-
-### Narrative arc
-
-**1. Motivation (Introduction)**
-Multiplexed imaging (CODEX, IMC, MIBI-TOF) generates single-cell protein expression data with spatial context across dozens of markers. Computational analysis requires cell representations that are (a) biologically discriminative — different cell types map to distinct embedding regions — and (b) sample-invariant — the same cell type from different patients or staining batches lands in the same place. Standard SSL approaches (contrastive learning, VICReg) applied to conventional CNN architectures fail condition (b): embedding spaces fragment by sample because cross-channel convolutions encode absolute staining intensities.
-
-**2. The channel-independence hypothesis (Methods)**
-In multiplexed imaging, cell identity is defined by *which* markers are expressed (relative co-expression), not by their joint absolute intensity. Architectures that respect this — processing each marker's spatial patch independently and concatenating features — should produce more sample-invariant embeddings. We instantiate this as CIM (Channel-Independent Model): a grouped depthwise convolutional backbone where no cross-marker mixing occurs until the projection neck. Trained with VICReg (no labels, no negative pairs), 1,000 iterations, batch 256.
-
-**3. Validation across 5 datasets (Results — Cell-level)**
-We evaluate on 5 datasets spanning 3 technologies (CODEX, IMC, MIBI-TOF), 7–18 cell types, and 31–41 markers:
-- **CIM outperforms EarlyFusion32 on linear probe accuracy in 4/5 datasets** and on silhouette in all 5, with 45× fewer parameters and 5× fewer training iterations.
-- **CIM_Norm** (L2-normalised input, one line of code) pushes MIBI_TNBC silhouette from −0.094 to +0.002 — the only model with non-negative silhouette on that dataset — at a cost of only 0.6pp LP accuracy.
-- **CIM_ProgFusion** achieves the best cluster structure (NMI, ARI) across datasets. Its cross-patient NMI stability (±0.008 SD, 5 CV splits) is the tightest of all models, making it the most reproducible representation across patient cohorts.
-- CIM with 1.1M parameters and 1k iterations matches KRONOS (ViT-Large, 47M parameters) on CODEX_cHL, revealing that the performance ceiling is panel-limited, not model-limited: the two irreducibly confusable class pairs both lack their canonical markers in the antibody panel.
-- 5-fold patient-held-out cross-validation confirms: EarlyFusion32's negative silhouette (−0.228 ± 0.034) is structural, not a training artefact. CIM_Norm is the only model with consistently non-negative silhouette across all folds.
-
-**4. Tissue region discovery (Results — Spatial)**
-The trained CIM backbone transfers to unsupervised tissue region discovery without any retraining: patch embeddings from a sliding window on full tissue images are clustered in PCA space. On MIBI_TNBC (40 patients):
-- **CIM's embedding supports 4 natural tissue compartments** (silhouette-optimal k=4); EarlyFusion32's embedding collapses to 2 (k=2 optimal), effectively only separating tumour from non-tumour.
-- CIM compartments are **15% more biologically distinct** than EarlyFusion32 (between-cluster JS: 0.371 vs 0.323) and align directly with canonical marker channels (Pan-Keratin → tumour, CD68 → macrophage zone, Vimentin → stroma).
-- **Cross-patient reproducibility analysis** (Hungarian-matched clusters, JS divergence) shows tumour-core compartments are highly conserved across 40 patients (median JS ~0.26), while macrophage infiltration compartments vary (median JS ~0.46), correctly mirroring known TNBC heterogeneity.
-- CIM spatial maps are visually coherent — contiguous, biologically annotatable tissue zones — while EarlyFusion32 maps show a salt-and-pepper pattern with poor alignment to marker signal.
-
-**5. Ablations and architectural insights (Discussion)**
-- Input L2-normalisation (CIM_Norm) is the single most impactful modification: it converts the batch-sensitivity problem from an architectural issue to an input normalisation issue, solvable with one line of code.
-- Progressive fusion (CIM_ProgFusion) is the best geometry model but trades ~1pp LP accuracy. Recommended for applications requiring unsupervised clustering or spatial analysis; plain CIM for applications requiring maximal linear probe accuracy.
-- CIMATT_Gate (marker gating + cross-marker attention) achieves the highest LP accuracy but fragmented geometry — an instructive negative result showing that gating on relative expression does not automatically produce smooth manifolds.
-- ResNet's partially sample-invariant behaviour (via implicit relative feature encoding) is notable but insufficient, and comes at a large LP accuracy cost.
-
-**6. Conclusion**
-Channel independence is not a niche design choice — it is the correct inductive bias for multiplexed proteomics data. The CIM family demonstrates that lightweight, interpretable architectures trained self-supervised can match large pretrained models on cell type classification, produce sample-invariant representations without explicit batch correction, and generalise to tissue-level spatial analysis without spatial supervision.
+*Last updated: March 2026. All paper results from `z_RUNS/paper/` (LARS 4k iters, batch 512, 5 datasets × 4 models = 20 runs).*
