@@ -21,6 +21,7 @@ We learn compact, label-free cell embeddings from high-plex spatial patches that
    - [IMC NB TumorSub](#imc_nb_tumorsub)
    - [MIBI TNBC](#mibi_tnbc)
    - [Panel Size: Less Is More](#panel-size-less-is-more)
+   - [Label Efficiency](#label-efficiency)
 8. [Key Findings](#key-findings)
 9. [How to Run](#how-to-run)
 
@@ -326,6 +327,10 @@ All paper results are in `z_RUNS/paper/<DATASET>/<MODEL>/metrics.json`.
 | CIM_ProgFusion | 0.714 | 0.728 | 0.579 | 0.368 | **0.235** | +0.007 |
 | ResNet | 0.666 | 0.675 | 0.584 | 0.361 | 0.211 | +0.040 |
 
+![UMAP KRONOS18](docs/figures/umap_CODEX_cHL_KRONOS18.png)
+
+*UMAP embeddings coloured by cell type — all four models on CODEX_cHL_KRONOS18. CIM shows the most compact, well-separated clusters.*
+
 CIM leads across all primary metrics. All four models produce positive silhouette scores — the KRONOS18 panel is well-suited to self-supervised learning, with clusters that are geometrically compact in embedding space.
 
 CIM_ProgFusion achieves the best ARI (0.235), suggesting its dual-branch fusion finds cleaner cluster boundaries despite slightly lower LP accuracy. ResNet's silhouette (0.040) is second-highest, consistent with its tendency to produce smooth, integrated geometry at the cost of LP discrimination.
@@ -344,6 +349,10 @@ CIM_ProgFusion achieves the best ARI (0.235), suggesting its dual-branch fusion 
 | CIM_ProgFusion | 0.706 | 0.706 | 0.556 | 0.323 | 0.168 | −0.005 |
 | EarlyFusion32 | 0.700 | 0.698 | 0.583 | **0.344** | **0.181** | +0.003 |
 | ResNet | 0.661 | 0.641 | 0.555 | 0.359 | 0.206 | −0.001 |
+
+![UMAP cHL Full Panel](docs/figures/umap_CODEX_cHL.png)
+
+*UMAP embeddings coloured by cell type — all four models on CODEX_cHL (41-marker full panel). Compare with KRONOS18 above: cluster separation is visibly reduced.*
 
 See [Panel Size: Less Is More](#panel-size-less-is-more) for direct KRONOS18 vs full-panel comparison.
 
@@ -365,6 +374,10 @@ See [Panel Size: Less Is More](#panel-size-less-is-more) for direct KRONOS18 vs 
 | EarlyFusion32 | 0.690 | 0.598 | 0.486 | 0.274 | 0.089 | −0.033 |
 | CIM | 0.686 | 0.588 | 0.495 | 0.249 | 0.143 | −0.049 |
 | ResNet | 0.593 | 0.479 | 0.436 | 0.285 | 0.123 | −0.050 |
+
+![UMAP DLBCL](docs/figures/umap_CODEX_DLBCL.png)
+
+*UMAP embeddings coloured by cell type — all four models on CODEX_DLBCL. Note the fragmented cluster structure (reflected in the universally negative silhouette scores).*
 
 **DLBCL is the hardest dataset** by a significant margin. All models produce negative silhouette scores — the embedding space is fragmented. MAP values (0.48–0.61) are far below other datasets because the fine T cell subtypes are almost indistinguishable from protein expression alone.
 
@@ -399,6 +412,10 @@ MC (43 cells) and NKT (134 cells) are near-random for all models. These rare sub
 | CIM | 0.778 | 0.767 | 0.654 | 0.356 | 0.180 | +0.014 |
 | ResNet | 0.769 | 0.759 | 0.660 | 0.373 | 0.180 | +0.025 |
 
+![UMAP IMC NB](docs/figures/umap_IMC_NB_TumorSub.png)
+
+*UMAP embeddings coloured by cell type — all four models on IMC_NB_TumorSub. CIM_ProgFusion shows the clearest intra-tumour subtype separation (best NMI/ARI).*
+
 **IMC_NB_TumorSub is the only dataset where EarlyFusion32 leads on LP and MAP.** The 11 tumour subtypes (TC_CD24pos, TC_CD24neg, TC_CD44, TC_CHGAhi, TC_CXCR4hi, TC_GATA3hi, TC_GD2lo, TC_bridge, TC_early, Proliferating, Progenitor) are distinguished primarily by co-expression patterns — early cross-channel mixing appears beneficial for this task.
 
 **CIM_ProgFusion achieves the best NMI (0.404) and ARI (0.206) and silhouette (+0.039)** — the best clustering geometry of any model on any dataset. This suggests that for fine-grained intra-tumour subtyping, the progressive fusion strategy produces the cleanest, most structured representation.
@@ -423,6 +440,10 @@ All models are competitive and close (LP range: 0.769–0.787), consistent with 
 | CIM_ProgFusion | 0.825 | 0.806 | 0.494 | 0.265 | 0.092 | −0.094 |
 | EarlyFusion32 | 0.815 | 0.801 | 0.573 | 0.259 | 0.089 | −0.041 |
 | ResNet | 0.699 | 0.641 | 0.524 | **0.296** | **0.110** | −0.044 |
+
+![UMAP MIBI TNBC](docs/figures/umap_MIBI_TNBC.png)
+
+*UMAP embeddings coloured by cell type — all four models on MIBI_TNBC. The patient-driven fragmentation (negative silhouette) is visible in the discontinuous cluster structure.*
 
 **MIBI_TNBC has the highest LP balanced accuracies** across all datasets, reflecting a clean marker-to-cell-type mapping (Pan-Keratin for tumour, FoxP3 for Tregs, CD8 for CD8 T cells, etc.). CIM leads at 0.835.
 
@@ -462,6 +483,28 @@ This has an important practical implication: **panel curation matters more than 
 ![Silhouette](docs/figures/fig4_silhouette.png)
 
 *Figure 4: Cosine silhouette score. Positive = compact cluster geometry; negative = fragmented/overlapping. Note the DLBCL models are universally negative and MIBI_TNBC shows patient-driven fragmentation.*
+
+---
+
+### Label Efficiency
+
+How much labelled data does each model need to reach good performance? We train a linear probe on subsets of training labels: 10, 50, 100, 200, 1000 cells per class, and the full training set.
+
+![Label Efficiency — Balanced Accuracy](docs/figures/fig10_label_efficiency.png)
+
+*Figure 10: Label efficiency curves (linear probe balanced accuracy) for all four models across all five datasets. X-axis: labelled cells per class (log scale). Each line is one model; bands show variability. The gap between models at low label counts reveals how information-dense the learned representations are.*
+
+![Label Efficiency — MAP](docs/figures/fig11_label_efficiency_map.png)
+
+*Figure 11: Label efficiency curves (mean AP) — more sensitive to rare class recovery than balanced accuracy.*
+
+**Key observations:**
+
+- **CIM maintains its lead at all label regimes.** Even at 10 cells per class, CIM representations are the most linearly separable on CODEX_cHL_KRONOS18, CODEX_cHL, and MIBI_TNBC.
+- **CIM_ProgFusion closes the gap at very low labels.** On CODEX_DLBCL, CIM_ProgFusion is the best model at 10–50 labels/class — the cross-channel fusion encodes more structure that is recoverable with fewer labels.
+- **EarlyFusion32 shows the steepest learning curve.** Its performance improves rapidly from 100 to 1000 labels/class but starts lower at 10 labels — it requires more supervision to extract the cross-marker co-expression signal.
+- **ResNet is consistently weakest** at all label counts, reflecting the information bottleneck of its 256-dimensional output.
+- **All models converge at full LP**, but the relative ranking is preserved — label efficiency mostly reflects intrinsic feature quality, not capacity.
 
 ---
 
