@@ -1,0 +1,173 @@
+{
+  "classes": [
+    "B",
+    "CD3 T",
+    "CD4 T",
+    "CD8 T",
+    "DC",
+    "DC/Mono",
+    "Endothelial",
+    "Keratin-positive tumor",
+    "Macrophages",
+    "Mesenchymal-like",
+    "Mono/Neu",
+    "NK",
+    "Neutrophils",
+    "Other immune",
+    "Tregs",
+    "Tumor"
+  ],
+  "n_classes": 16,
+  "epochs": 2000,
+  "n_repeats": 3,
+  "points": [
+    {
+      "label": "10/cls",
+      "n_labeled": 160,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.6107360568324981,
+      "bal_acc_std": 0.011635596278344134,
+      "mean_ap_mean": 0.5341760977220723,
+      "mean_ap_std": 0.009925809961756144,
+      "bal_acc_runs": [
+        0.62009,
+        0.61778,
+        0.59433
+      ],
+      "mean_ap_runs": [
+        0.53787,
+        0.54406,
+        0.5206
+      ]
+    },
+    {
+      "label": "50/cls",
+      "n_labeled": 800,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.7154858729068194,
+      "bal_acc_std": 0.007614285617820044,
+      "mean_ap_mean": 0.6240768312507324,
+      "mean_ap_std": 0.008937020464134901,
+      "bal_acc_runs": [
+        0.71131,
+        0.72617,
+        0.70898
+      ],
+      "mean_ap_runs": [
+        0.62121,
+        0.63617,
+        0.61485
+      ]
+    },
+    {
+      "label": "1%",
+      "n_labeled": 1371,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.657410960653959,
+      "bal_acc_std": 0.005531257709142405,
+      "mean_ap_mean": 0.6284732797472253,
+      "mean_ap_std": 0.0035445692162563414,
+      "bal_acc_runs": [
+        0.65259,
+        0.66516,
+        0.65449
+      ],
+      "mean_ap_runs": [
+        0.62385,
+        0.63246,
+        0.62911
+      ]
+    },
+    {
+      "label": "100/cls",
+      "n_labeled": 1600,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.7500820628215162,
+      "bal_acc_std": 0.0022865987218170765,
+      "mean_ap_mean": 0.6670019183939436,
+      "mean_ap_std": 0.006487177819904772,
+      "bal_acc_runs": [
+        0.75175,
+        0.75165,
+        0.74685
+      ],
+      "mean_ap_runs": [
+        0.67497,
+        0.65908,
+        0.66695
+      ]
+    },
+    {
+      "label": "200/cls",
+      "n_labeled": 3200,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.7828692226720815,
+      "bal_acc_std": 0.00392363672607343,
+      "mean_ap_mean": 0.7086821836555685,
+      "mean_ap_std": 0.0026293808432406654,
+      "bal_acc_runs": [
+        0.78255,
+        0.77823,
+        0.78783
+      ],
+      "mean_ap_runs": [
+        0.70883,
+        0.70539,
+        0.71182
+      ]
+    },
+    {
+      "label": "10%",
+      "n_labeled": 13716,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.7900960768459311,
+      "bal_acc_std": 0.00262213863403853,
+      "mean_ap_mean": 0.7540523438183637,
+      "mean_ap_std": 0.0015746156147852949,
+      "bal_acc_runs": [
+        0.79221,
+        0.79167,
+        0.7864
+      ],
+      "mean_ap_runs": [
+        0.75211,
+        0.75409,
+        0.75596
+      ]
+    },
+    {
+      "label": "1000/cls",
+      "n_labeled": 15280,
+      "n_repeats": 3,
+      "bal_acc_mean": 0.8239458816967516,
+      "bal_acc_std": 0.00020090021944738412,
+      "mean_ap_mean": 0.7706717967662375,
+      "mean_ap_std": 0.0013687928549466317,
+      "bal_acc_runs": [
+        0.82409,
+        0.82409,
+        0.82366
+      ],
+      "mean_ap_runs": [
+        0.7698,
+        0.76961,
+        0.7726
+      ]
+    },
+    {
+      "label": "100%",
+      "n_labeled": 137159,
+      "n_repeats": 1,
+      "bal_acc_mean": 0.8349439108702179,
+      "bal_acc_std": 0.0,
+      "mean_ap_mean": 0.8063107237586788,
+      "mean_ap_std": 0.0,
+      "bal_acc_runs": [
+        0.8349439108702179
+      ],
+      "mean_ap_runs": [
+        0.8063107237586788
+      ]
+    }
+  ]
+}
