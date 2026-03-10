@@ -198,7 +198,6 @@ class OpenPhenomBackbone(nn.Module):
                 p.requires_grad_(False)
 
         self.out_channels = 384  # ViT-S embed_dim
-        self.max_channels = 11  # OpenPhenom pos_embed supports up to 11 channels
 
     def forward(self, x: torch.Tensor, *args, **kwargs):
         """
@@ -221,13 +220,11 @@ class OpenPhenomBackbone(nn.Module):
             x = (x * 255).clamp(0, 255)
         x = x.to(torch.uint8)
 
-        # Split into chunks of max_channels, average embeddings across chunks
-        chunk_feats = []
-        for start in range(0, C, self.max_channels):
-            chunk = x[:, start:start + self.max_channels]   # [B, <=11, H, W]
-            chunk_feats.append(self.model.predict(chunk))   # [B, 384]
-
-        feat = torch.stack(chunk_feats, dim=0).mean(dim=0)  # [B, 384]
+        # Embed each channel independently and average.
+        # More principled than chunking: symmetric treatment of all markers,
+        # no grouping artifact, uses model in its intended single-channel regime.
+        per_channel = [self.model.predict(x[:, c:c+1]) for c in range(C)]  # C × [B, 384]
+        feat = torch.stack(per_channel, dim=0).mean(dim=0)                 # [B, 384]
         return (feat.view(B, self.out_channels, 1, 1),)
 
 

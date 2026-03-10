@@ -69,7 +69,7 @@ def test_ophenphenom_forward():
     # Full 18-channel input — chunked internally into groups of <=11
     with torch.no_grad():
         out = model(dummy.to(DEVICE))[0]   # [B, 384, 1, 1]
-    return f"input={tuple(dummy.shape)}  output={tuple(out.shape)}  (chunked into ceil(18/11)=2 groups)"
+    return f"input={tuple(dummy.shape)}  output={tuple(out.shape)}  (per-channel, averaged over 18)"
 
 check("OpenPhenom load", test_ophenphenom_load)
 check("OpenPhenom forward pass", test_ophenphenom_forward)
