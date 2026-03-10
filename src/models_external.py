@@ -183,6 +183,14 @@ class OpenPhenomBackbone(nn.Module):
             sys.path.insert(0, maes_dir)
 
         from huggingface_mae import MAEModel
+
+        # If hf_model_path looks like a HF repo id (no path separator),
+        # download it to a local cache first so from_pretrained works
+        # regardless of huggingface_hub version.
+        if not os.path.isdir(hf_model_path):
+            from huggingface_hub import snapshot_download
+            hf_model_path = snapshot_download(repo_id=hf_model_path)
+
         self.model = MAEModel.from_pretrained(hf_model_path)
         self.model.eval()
         if freeze:
@@ -190,26 +198,36 @@ class OpenPhenomBackbone(nn.Module):
                 p.requires_grad_(False)
 
         self.out_channels = 384  # ViT-S embed_dim
+        self.max_channels = 11  # OpenPhenom pos_embed supports up to 11 channels
 
     def forward(self, x: torch.Tensor, *args, **kwargs):
         """
         Args:
-            x: [B, C, H, W] float32, values in [0, 1] or any scale
-               (OpenPhenom self-standardises internally).
+            x: [B, C, H, W] float32, values in [0, 1] or any scale.
+               Supports any number of channels C by chunking into groups
+               of <= 11 and averaging the resulting embeddings.
         Returns:
-            ([B, D, 1, 1],)
+            ([B, 384, 1, 1],)
         """
-        B = x.shape[0]
+        B, C = x.shape[:2]
+
         # Resize to model's expected input size
         if x.shape[-1] != self.img_size or x.shape[-2] != self.img_size:
             x = F.interpolate(x, size=(self.img_size, self.img_size),
                               mode='bilinear', align_corners=False)
-        # OpenPhenom expects uint8 [0,255] — scale if needed
+
+        # OpenPhenom expects uint8 [0,255]
         if x.max() <= 1.0:
             x = (x * 255).clamp(0, 255)
         x = x.to(torch.uint8)
 
-        feat = self.model.predict(x)          # [B, 384]
+        # Split into chunks of max_channels, average embeddings across chunks
+        chunk_feats = []
+        for start in range(0, C, self.max_channels):
+            chunk = x[:, start:start + self.max_channels]   # [B, <=11, H, W]
+            chunk_feats.append(self.model.predict(chunk))   # [B, 384]
+
+        feat = torch.stack(chunk_feats, dim=0).mean(dim=0)  # [B, 384]
         return (feat.view(B, self.out_channels, 1, 1),)
 
 
@@ -242,17 +260,29 @@ class DINOv2Backbone(nn.Module):
     }
 
     def __init__(self, variant: str = 'dinov2_vitb14',
-                 img_size: int = 224, freeze: bool = True):
+                 img_size: int = 224, freeze: bool = True,
+                 repo_path: str = None):
         super().__init__()
         assert img_size % 14 == 0, f"img_size must be a multiple of 14, got {img_size}"
         self.img_size = img_size
         self.out_channels = self.EMBED_DIMS[variant]
 
-        self.vit = torch.hub.load(
-            'facebookresearch/dinov2', variant, pretrained=True,
-            source='local',
-            trust_repo=True,
-        )
+        # repo_path: absolute path to a local dinov2 clone.
+        # Falls back to ~/src/dinov2, then torch hub (online download).
+        if repo_path is None:
+            candidate = os.path.expanduser('~/src/dinov2')
+            if os.path.isdir(candidate):
+                repo_path = candidate
+
+        if repo_path is not None:
+            self.vit = torch.hub.load(
+                repo_path, variant, pretrained=True,
+                source='local', trust_repo=True,
+            )
+        else:
+            self.vit = torch.hub.load(
+                'facebookresearch/dinov2', variant, pretrained=True,
+            )
 
         # Adapt patch embed: Conv2d(3→D) → Conv2d(1→D)
         self.vit.patch_embed.proj = _adapt_patch_embed_to_1channel(
