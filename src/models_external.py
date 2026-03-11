@@ -347,9 +347,11 @@ class UNIBackbone(nn.Module):
         self.out_channels = 1024  # ViT-L embed_dim
 
         import timm
+        # Always create at native 224px so the checkpoint pos_embed matches,
+        # then our _interp_pos handles any other img_size at forward time.
         self.vit = timm.create_model(
             'vit_large_patch16_224',
-            img_size=img_size,
+            img_size=224,
             patch_size=16,
             init_values=1e-5,
             num_classes=0,
