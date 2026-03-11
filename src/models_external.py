@@ -111,14 +111,27 @@ def _channel_agnostic_vit_forward(model, x: torch.Tensor,
         )
     patch_tokens = torch.cat(patch_tokens_list, dim=1)  # [B, C*N, D]
 
-    # 2. Positional embeddings: tile the spatial pos embed C times
-    #    (channels share the same spatial grid — they are differentiated
-    #     purely by their content, not by position)
+    # 2. Positional embeddings: interpolate to actual grid, then tile C times
+    ps = model.patch_embed.patch_size
+    ps = ps[0] if isinstance(ps, (tuple, list)) else ps
+    h_p, w_p = H // ps, W // ps   # actual patch grid
+
+    def _interp_pos(spatial_pos):
+        """Interpolate spatial pos_embed [1, N_orig, D] → [1, h_p*w_p, D]."""
+        N_orig = spatial_pos.shape[1]
+        if N_orig == h_p * w_p:
+            return spatial_pos
+        D = spatial_pos.shape[2]
+        h_orig = w_orig = int(N_orig ** 0.5)
+        pos = spatial_pos.reshape(1, h_orig, w_orig, D).permute(0, 3, 1, 2)
+        pos = F.interpolate(pos.float(), size=(h_p, w_p), mode='bicubic', align_corners=False)
+        return pos.permute(0, 2, 3, 1).reshape(1, h_p * w_p, D).to(spatial_pos.dtype)
+
     if model_type == 'dinov2':
-        cls_pos    = model.pos_embed[:, :1]        # [1, 1, D]
-        spatial_pos = model.pos_embed[:, 1:]       # [1, N, D]
-        spatial_pos = spatial_pos.repeat(1, C, 1)  # [1, C*N, D]
-        cls_token  = model.cls_token.expand(B, -1, -1)
+        cls_pos     = model.pos_embed[:, :1]                          # [1, 1, D]
+        spatial_pos = _interp_pos(model.pos_embed[:, 1:])             # [1, h_p*w_p, D]
+        spatial_pos = spatial_pos.repeat(1, C, 1)                     # [1, C*h_p*w_p, D]
+        cls_token   = model.cls_token.expand(B, -1, -1)
 
         x_seq = torch.cat([cls_token, patch_tokens], dim=1)           # [B, 1+C*N, D]
         x_seq = x_seq + torch.cat([cls_pos, spatial_pos], dim=1)      # add pos
@@ -134,9 +147,9 @@ def _channel_agnostic_vit_forward(model, x: torch.Tensor,
         return x_seq[:, 0]  # CLS token [B, D]
 
     else:  # timm ViT (UNI)
-        cls_pos     = model.pos_embed[:, :1]       # [1, 1, D]
-        spatial_pos = model.pos_embed[:, 1:]       # [1, N, D]
-        spatial_pos = spatial_pos.repeat(1, C, 1)  # [1, C*N, D]
+        cls_pos     = model.pos_embed[:, :1]                          # [1, 1, D]
+        spatial_pos = _interp_pos(model.pos_embed[:, 1:])             # [1, h_p*w_p, D]
+        spatial_pos = spatial_pos.repeat(1, C, 1)                     # [1, C*h_p*w_p, D]
         cls_token   = model.cls_token.expand(B, -1, -1)
 
         x_seq = torch.cat([cls_token, patch_tokens], dim=1)
