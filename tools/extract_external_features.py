@@ -398,14 +398,16 @@ def build_model(args):
 
     name = args.model.lower()
     if name == 'openphenom':
-        print('Loading OpenPhenom...')
+        img_size = args.img_size if args.img_size else 64
+        print(f'Loading OpenPhenom (img_size={img_size})...')
         return OpenPhenomBackbone(
             hf_model_path=args.openphenom_dir or 'recursionpharma/OpenPhenom',
-            img_size=256,
+            img_size=img_size,
         )
     elif name.startswith('dinov2'):
-        print(f'Loading DINOv2 ({args.model})...')
-        return DINOv2Backbone(variant=args.model, img_size=224)
+        img_size = args.img_size if args.img_size else 56  # multiple of 14; 4×4=16 patches
+        print(f'Loading DINOv2 ({args.model}, img_size={img_size})...')
+        return DINOv2Backbone(variant=args.model, img_size=img_size)
     elif name == 'uni':
         assert args.uni_ckpt, '--uni_ckpt is required for UNI'
         print('Loading UNI...')
@@ -442,6 +444,10 @@ def main():
 
     # Output / hardware
     p.add_argument('--out',          required=True)
+    p.add_argument('--img_size',     type=int, default=None,
+                   help='Resize patches to this square size before the model '
+                        '(default: 56 for DINOv2, 64 for OpenPhenom). '
+                        'Must be a multiple of the model patch stride (14 for DINOv2, 16 for OpenPhenom).')
     p.add_argument('--gpu',          type=int, default=0)
     p.add_argument('--batch_size',   type=int, default=128)
     p.add_argument('--num_workers',  type=int, default=4)
