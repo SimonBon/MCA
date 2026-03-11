@@ -103,13 +103,13 @@ def _channel_agnostic_vit_forward(model, x: torch.Tensor,
     else:  # timm ViT (UNI)
         proj = model.patch_embed.proj
 
-    patch_tokens_list = []
-    for c in range(C):
-        p = proj(x[:, c:c+1])             # [B, D, h_p, w_p]
-        patch_tokens_list.append(
-            p.flatten(2).transpose(1, 2)  # [B, N, D]
-        )
-    patch_tokens = torch.cat(patch_tokens_list, dim=1)  # [B, C*N, D]
+    # Process all channels in one batched conv call instead of a Python loop
+    x_flat = x.reshape(B * C, 1, H, W)              # [B*C, 1, H, W]
+    p_flat = proj(x_flat)                            # [B*C, D, h_p, w_p]
+    N = p_flat.shape[2] * p_flat.shape[3]
+    D = p_flat.shape[1]
+    patch_tokens = p_flat.flatten(2).transpose(1, 2) # [B*C, N, D]
+    patch_tokens = patch_tokens.reshape(B, C * N, D) # [B, C*N, D]
 
     # 2. Positional embeddings: interpolate to actual grid, then tile C times
     ps = model.patch_embed.patch_size
