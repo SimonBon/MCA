@@ -101,6 +101,7 @@ class MCIDatasetH5(Dataset):
         self.patch_size   = patch_size
         self.half         = patch_size // 2
         self._h5f         = None   # opened per-worker in __getitem__
+        self._img_cache   = {}     # sample_id → (img_np, mask_np) in-memory cache
 
         with h5py.File(h5_filepath, 'r') as f:
             coords            = f['coords']
@@ -148,13 +149,14 @@ class MCIDatasetH5(Dataset):
     def _open_h5(self):
         """Open HDF5 lazily (safe for DataLoader workers)."""
         if self._h5f is None:
-            self._h5f = h5py.File(self.h5_filepath, 'r', swmr=True)
+            self._h5f = h5py.File(self.h5_filepath, 'r')
 
     def _get_patch(self, dim1, dim2, sample_id):
         self._open_h5()
-        grp  = self._h5f['data'][sample_id] if 'data' in self._h5f else self._h5f[sample_id]
-        img  = grp['image']
-        mask = grp['masks']
+        if sample_id not in self._img_cache:
+            grp = self._h5f['data'][sample_id] if 'data' in self._h5f else self._h5f[sample_id]
+            self._img_cache[sample_id] = (grp['image'][:], grp['masks'][:])
+        img, mask = self._img_cache[sample_id]
         H, W = img.shape[0], img.shape[1]
         half = self.half
 
@@ -166,7 +168,7 @@ class MCIDatasetH5(Dataset):
         r0, r1 = max(0, r0), min(H, r1)
         c0, c1 = max(0, c0), min(W, c1)
 
-        patch = img[r0:r1, c0:c1, self.marker_idx]   # [h, w, C]
+        patch = img[r0:r1, c0:c1][:, :, self.marker_idx]   # [h, w, C]
         msk   = mask[r0:r1, c0:c1]
 
         if any([pr0, pr1, pc0, pc1]):
@@ -202,8 +204,13 @@ def build_dataloader(h5_path, patch_size, markers_file, indicies_file,
         ignore_annotations=ignore,
     )
     print(f'  {len(ds)} cells | {len(ds.marker_names)} markers: {list(ds.marker_names)}')
-    loader = DataLoader(ds, batch_size=batch_size, shuffle=False,
-                        num_workers=num_workers, pin_memory=True, drop_last=False)
+    # Sort by sample_id so each worker keeps its sample image cached across consecutive cells
+    order = np.argsort(ds.sample_id, kind='stable')
+    loader = DataLoader(
+        torch.utils.data.Subset(ds, order),
+        batch_size=batch_size, shuffle=False,
+        num_workers=num_workers, pin_memory=True, drop_last=False,
+    )
     return loader
 
 
