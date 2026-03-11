@@ -195,7 +195,7 @@ class MCIDatasetH5(Dataset):
 
 
 def build_dataloader(h5_path, patch_size, markers_file, indicies_file,
-                     ignore, batch_size, num_workers):
+                     ignore, batch_size, num_workers, max_cells=None):
     ds = MCIDatasetH5(
         h5_filepath=h5_path,
         patch_size=patch_size,
@@ -203,9 +203,11 @@ def build_dataloader(h5_path, patch_size, markers_file, indicies_file,
         used_indicies_file=indicies_file,
         ignore_annotations=ignore,
     )
-    print(f'  {len(ds)} cells | {len(ds.marker_names)} markers: {list(ds.marker_names)}')
     # Sort by sample_id so each worker keeps its sample image cached across consecutive cells
     order = np.argsort(ds.sample_id, kind='stable')
+    if max_cells is not None:
+        order = order[:max_cells]
+    print(f'  {len(order)} cells | {len(ds.marker_names)} markers: {list(ds.marker_names)}')
     loader = DataLoader(
         torch.utils.data.Subset(ds, order),
         batch_size=batch_size, shuffle=False,
@@ -452,6 +454,8 @@ def main():
     p.add_argument('--batch_size',   type=int, default=128)
     p.add_argument('--num_workers',  type=int, default=4)
     p.add_argument('--n_jobs',       type=int, default=4)
+    p.add_argument('--max_cells',    type=int, default=None,
+                   help='Limit train and val to this many cells (for quick smoke tests)')
     p.add_argument('--skip_extract', action='store_true',
                    help='Skip GPU extraction if train/val_results.npz already exist')
     args = p.parse_args()
@@ -479,11 +483,13 @@ def main():
         print('Train:')
         train_loader = build_dataloader(args.h5, args.patch_size, args.markers,
                                         args.train_idx, ignore,
-                                        args.batch_size, args.num_workers)
+                                        args.batch_size, args.num_workers,
+                                        max_cells=args.max_cells)
         print('Val:')
         val_loader   = build_dataloader(args.h5, args.patch_size, args.markers,
                                         args.val_idx,   ignore,
-                                        args.batch_size, args.num_workers)
+                                        args.batch_size, args.num_workers,
+                                        max_cells=args.max_cells)
 
         print('\nExtracting train features...')
         train_feats, train_labels_str, train_sids = extract_features(
