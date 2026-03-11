@@ -152,8 +152,9 @@ class MCIDatasetH5(Dataset):
 
     def _get_patch(self, dim1, dim2, sample_id):
         self._open_h5()
-        img  = self._h5f[sample_id]['image']
-        mask = self._h5f[sample_id]['masks']
+        grp  = self._h5f['data'][sample_id] if 'data' in self._h5f else self._h5f[sample_id]
+        img  = grp['image']
+        mask = grp['masks']
         H, W = img.shape[0], img.shape[1]
         half = self.half
 
