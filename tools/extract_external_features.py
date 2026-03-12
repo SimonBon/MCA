@@ -245,7 +245,8 @@ def run_evaluation(train_feats, train_labels_str, val_feats, val_labels_str,
                    val_sample_ids, work_dir, n_jobs=4, knn_k=15,
                    silhouette_max=10_000,
                    le_fractions=(0.01, 0.1),
-                   le_n_per_class=(10, 50, 100, 200, 1000)):
+                   le_n_per_class=(10, 50, 100, 200, 1000),
+                   skip_label_efficiency=False):
 
     le = LabelEncoder().fit(np.concatenate([train_labels_str, val_labels_str]))
     classes   = list(le.classes_)
@@ -296,8 +297,9 @@ def run_evaluation(train_feats, train_labels_str, val_feats, val_labels_str,
     sil   = float(silhouette_score(val_feats[idx], val_y[idx], metric='cosine'))
 
     # ── Neighbourhood purity ────────────────────────────────────────────────
+    # knn is fit on train_feats, so nbrs[i] are indices into train_y
     nbrs   = knn.kneighbors(val_feats, n_neighbors=knn_k, return_distance=False)
-    purity = float(np.mean([np.mean(val_y[nbrs[i]] == val_y[i])
+    purity = float(np.mean([np.mean(train_y[nbrs[i]] == val_y[i])
                              for i in range(len(val_y))]))
 
     # ── UMAP ────────────────────────────────────────────────────────────────
@@ -307,7 +309,7 @@ def run_evaluation(train_feats, train_labels_str, val_feats, val_labels_str,
         n_u = min(20_000, len(val_feats))
         idx_u = rng.choice(len(val_feats), n_u, replace=False)
         emb = umap_lib.UMAP(n_components=2, metric='cosine',
-                             random_state=42, n_jobs=n_jobs).fit_transform(val_feats[idx_u])
+                             n_jobs=n_jobs).fit_transform(val_feats[idx_u])
         np.savez(os.path.join(work_dir, 'umap_embeddings.npz'),
                  embedding=emb, labels=val_labels_str[idx_u],
                  sample_ids=val_sample_ids[idx_u])
@@ -343,6 +345,9 @@ def run_evaluation(train_feats, train_labels_str, val_feats, val_labels_str,
           f'  NMI={nmi:.3f}  ARI={ari:.3f}  Sil={sil:+.3f}')
 
     # ── Label efficiency ────────────────────────────────────────────────────
+    if skip_label_efficiency:
+        print('  Label efficiency... skipped (--skip_label_efficiency)')
+        return metrics
     print('  Label efficiency...')
     rng2 = np.random.default_rng(0)
 
@@ -412,8 +417,9 @@ def build_model(args):
         return DINOv2Backbone(variant=args.model, img_size=img_size)
     elif name == 'uni':
         assert args.uni_ckpt, '--uni_ckpt is required for UNI'
-        print('Loading UNI...')
-        return UNIBackbone(ckpt_path=args.uni_ckpt, img_size=224)
+        img_size = args.img_size if args.img_size else 32  # 32px → 2×2=4 patches/channel
+        print(f'Loading UNI (img_size={img_size})...')
+        return UNIBackbone(ckpt_path=args.uni_ckpt, img_size=img_size)
     else:
         raise ValueError(f'Unknown model: {args.model}')
 
@@ -458,6 +464,8 @@ def main():
                    help='Limit train and val to this many cells (for quick smoke tests)')
     p.add_argument('--skip_extract', action='store_true',
                    help='Skip GPU extraction if train/val_results.npz already exist')
+    p.add_argument('--skip_label_efficiency', action='store_true',
+                   help='Skip label-efficiency LP curves (saves ~1-2h on large datasets)')
     args = p.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -491,14 +499,25 @@ def main():
                                         args.batch_size, args.num_workers,
                                         max_cells=args.max_cells)
 
-        print('\nExtracting train features...')
-        train_feats, train_labels_str, train_sids = extract_features(
-            model, train_loader, device, 'train')
+        # ── Train extraction (resume if train_npz already saved) ──────────
+        if args.skip_extract and os.path.exists(train_npz):
+            print('Loading cached train features...')
+            tr = np.load(train_npz, allow_pickle=True)
+            train_feats, train_labels_str, train_sids = tr['features'], tr['labels_str'], tr['sample_ids']
+        else:
+            print('\nExtracting train features...')
+            train_feats, train_labels_str, train_sids = extract_features(
+                model, train_loader, device, 'train')
+            # Save train immediately so a crash during val doesn't lose this work
+            np.savez(train_npz, features=train_feats, labels_str=train_labels_str,
+                     sample_ids=train_sids)
+            print(f'  Train features saved → {train_npz}')
 
         print('Extracting val features...')
         val_feats, val_labels_str, val_sids = extract_features(
             model, val_loader, device, 'val')
 
+        # Re-save both with a shared LabelEncoder (adds labels_num + classes)
         le_enc = LabelEncoder().fit(np.concatenate([train_labels_str, val_labels_str]))
         np.savez(train_npz, features=train_feats, labels_str=train_labels_str,
                  labels_num=le_enc.transform(train_labels_str),
@@ -512,7 +531,8 @@ def main():
     print('\nRunning evaluation...')
     run_evaluation(train_feats, train_labels_str,
                    val_feats,   val_labels_str, val_sids,
-                   work_dir=args.out, n_jobs=args.n_jobs)
+                   work_dir=args.out, n_jobs=args.n_jobs,
+                   skip_label_efficiency=args.skip_label_efficiency)
     print(f'\nDone. Results in {args.out}')
 
 
