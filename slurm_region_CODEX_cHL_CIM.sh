@@ -16,16 +16,20 @@ conda activate mca310
 BASE=/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper
 H5=/nobackup/lab_taschner-mandl/simongutwein/h5_files/CODEX_cHL/CODEX_cHL.h5
 MARKERS=/nobackup/lab_taschner-mandl/simongutwein/h5_files/CODEX_cHL/used_markers.txt
-OUT=/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/region_analysis/CODEX_cHL_CIM
+OUT=/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/region_analysis/CODEX_cHL_CIM_ps128
 
 mkdir -p "$OUT"
+
+EMB=/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/region_analysis/embeddings/CODEX_cHL_CIM_ps128
 
 python /home/sgutwein/src/MCA/tools/region_analysis.py \
     --model_dir  "$BASE/CODEX_cHL/CIM" \
     --h5         "$H5" \
     --markers    "$MARKERS" \
     --out        "$OUT" \
-    --patch_size 64 \
-    --k          6 \
+    --emb_dir    "$EMB" \
+    --patch_size 128 \
+    --k          500 \
+    --batch_size 32 \
     --n_jobs     8 \
     --display_markers Cytokeritin CD3 CD68 Vimentin DAPI-01 CD20

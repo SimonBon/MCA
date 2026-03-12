@@ -26,8 +26,8 @@ python tools/region_analysis.py \
     --h5         /path/to/CODEX_cHL.h5 \
     --markers    /path/to/used_markers.txt \
     --out        z_RUNS/region_analysis/CODEX_cHL_CIM \
-    --patch_size 64 \
-    --k          6 \
+    --patch_size 128 \
+    --k          150 \
     --display_markers Pan-Keratin CD3 CD68 Vimentin DAPI-01
 """
 
@@ -56,8 +56,8 @@ def parse_args():
     p.add_argument("--h5",         required=True)
     p.add_argument("--markers",    required=True, help="used_markers.txt")
     p.add_argument("--out",        required=True)
-    p.add_argument("--patch_size", type=int, default=64)
-    p.add_argument("--k",          type=int, default=6, help="Number of spatial clusters")
+    p.add_argument("--patch_size", type=int, default=128)
+    p.add_argument("--k",          type=int, default=150, help="PhenoGraph k (number of nearest neighbours); larger = fewer communities")
     p.add_argument("--pca",        type=int, default=64)
     p.add_argument("--batch_size", type=int, default=64)
     p.add_argument("--n_jobs",     type=int, default=8)
@@ -68,6 +68,9 @@ def parse_args():
     p.add_argument("--display_markers", nargs="+",
                    default=["Pan-Keratin", "CD3", "CD68", "Vimentin", "dsDNA"],
                    help="Marker names for the signal overlay column")
+    p.add_argument("--emb_dir",  default=None,
+                   help="Directory to store/load embeddings.npz independently of --out. "
+                        "Defaults to --out if not set.")
     p.add_argument("--reload", action="store_true",
                    help="Re-embed even if embeddings.npz already exists")
     return p.parse_args()
@@ -239,7 +242,7 @@ def plot_spatial_and_markers(labels, k, show_sids, meta, sid2idx,
     available = [m for m in display_markers if m in amn_str]
     d_idx     = [amn_str.index(m) for m in available]
 
-    cmap   = plt.cm.get_cmap("tab10", k)
+    cmap   = plt.cm.get_cmap("tab20" if k <= 20 else "nipy_spectral", k)
     n_rows = len(show_sids)
     n_cols = 1 + len(available)
 
@@ -284,12 +287,12 @@ def plot_umap(emb_pca, labels, k, n_jobs, umap_max, save_path):
     xy   = umap_lib.UMAP(n_components=2, n_neighbors=30, min_dist=0.1,
                          metric="cosine", n_jobs=n_jobs, verbose=False
                          ).fit_transform(emb_pca[idx].astype(np.float32))
-    cmap = plt.cm.get_cmap("tab10", k)
+    cmap = plt.cm.get_cmap("tab20" if k <= 20 else "nipy_spectral", k)
     fig, ax = plt.subplots(figsize=(7, 6))
     sc = ax.scatter(xy[:, 0], xy[:, 1], c=labels[idx], cmap=cmap,
                     vmin=-0.5, vmax=k - 0.5, s=2, alpha=0.5, rasterized=True)
     plt.colorbar(sc, ax=ax, label="Cluster", ticks=range(k))
-    ax.set(title=f"UMAP  k={k}", xlabel="UMAP 1", ylabel="UMAP 2")
+    ax.set(title=f"UMAP  PhenoGraph k={k} communities", xlabel="UMAP 1", ylabel="UMAP 2")
     ax.axis("off")
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches="tight")
@@ -348,7 +351,6 @@ def main():
     args = parse_args()
 
     import numpy as np
-    from sklearn.cluster import MiniBatchKMeans
     from sklearn.decomposition import PCA
     import matplotlib; matplotlib.use("Agg")
 
@@ -361,12 +363,14 @@ def main():
     except ImportError:
         pass
 
-    DEVICE = args.gpu if torch.cuda.is_available() else "cpu"
-    ps     = args.patch_size
-    stride = ps // 2
-    k      = args.k
-    out    = Path(args.out)
+    DEVICE  = args.gpu if torch.cuda.is_available() else "cpu"
+    ps      = args.patch_size
+    stride  = ps // 2
+    k       = args.k
+    out     = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    emb_dir = Path(args.emb_dir) if args.emb_dir else out
+    emb_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Device : {DEVICE}   Patch: {ps}px   k: {k}")
     print(f"Output : {out}")
@@ -386,7 +390,7 @@ def main():
     print(f"Patches: {len(meta):,}   Patients: {len(unique_sids)}")
 
     # Embeddings (load from cache or compute)
-    emb_path = out / "embeddings.npz"
+    emb_path = emb_dir / "embeddings.npz"
     if not args.reload and emb_path.exists():
         print(f"Loading cached embeddings from {emb_path}")
         cache = np.load(emb_path, allow_pickle=True)
@@ -411,17 +415,22 @@ def main():
                             patch_x=xs_arr)
         print(f"Saved embeddings → {emb_path}  ({emb.nbytes/1024**2:.0f} MB)")
 
-    # PCA + clustering
-    print("PCA + k-means...")
+    # PCA + PhenoGraph clustering
+    print("PCA + PhenoGraph...")
     pca     = PCA(n_components=args.pca, random_state=42)
     emb_pca = pca.fit_transform(emb.astype(np.float32))
     print(f"  PCA explained variance: {pca.explained_variance_ratio_.sum():.1%}")
 
-    km     = MiniBatchKMeans(n_clusters=k, random_state=42, n_init=10,
-                             batch_size=4096, max_iter=300)
-    labels = km.fit_predict(emb_pca)
-    np.save(out / "cluster_labels.npy", labels)
+    import phenograph
+    labels, graph, q = phenograph.cluster(emb_pca, k=k, n_jobs=args.n_jobs,
+                                          seed=42)
+    labels = np.array(labels)
+    k_actual = int(labels.max()) + 1
+    print(f"  PhenoGraph found {k_actual} communities (modularity Q={q:.3f})")
     print(f"  Cluster sizes: {np.bincount(labels).tolist()}")
+    np.save(out / "cluster_labels.npy", labels)
+    # use actual k for all downstream plots
+    k = k_actual
 
     # Cell → patch mapping
     p2ann = map_cells(ds["cell_mask"], ds["cell_sids"], ds["cell_y"], ds["cell_x"],
