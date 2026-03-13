@@ -698,6 +698,107 @@ class WideModelProgressiveFusion(nn.Module):
         return (fusion,)
 
 
+@MODELS.register_module()
+class CIM_Funnel(nn.Module):
+    """
+    Two-phase backbone: channel-independent early, channel-mixing late.
+
+    Phase 1 — depthwise (groups=in_channels):
+        Standard CIM processing. Each marker's features evolve independently.
+        AvgPool halves spatial resolution after each stage.
+        Cheap because groups keeps marker pathways separate.
+
+    Phase 2 — full conv (groups=1) on the downscaled map:
+        Once H×W is small (e.g. 5×5 after two halvings of a 20×20 patch),
+        standard cross-channel convolutions are affordable. These blocks learn
+        relative co-expression patterns — which markers are high vs low together —
+        which are inherently more patient-invariant than absolute intensities.
+
+    A lightweight transition conv projects to mix_channels before Phase 2
+    to keep parameter count manageable.
+
+    Args:
+        in_channels:        Number of input markers.
+        stem_width:         Per-marker expansion factor in the depthwise stem.
+        block_width:        FFN expansion ratio inside ConvBlocks.
+        sep_layer_config:   ConvBlocks per depthwise stage (AvgPool after each).
+        mix_n_blocks:       Number of cross-channel ConvBlocks in Phase 2.
+        mix_channels:       Channel dim for Phase 2. Defaults to in_channels * stem_width.
+        drop_prob:          Dropout probability.
+        input_norm:         L2-normalise input along channel dim before stem.
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        stem_width: int = 16,
+        block_width: int = 4,
+        sep_layer_config=None,
+        mix_n_blocks: int = 2,
+        mix_channels: int = None,
+        drop_prob: float = 0.05,
+        input_norm: bool = False,
+    ):
+        super().__init__()
+
+        if sep_layer_config is None:
+            sep_layer_config = [2, 2]
+
+        self.in_channels = in_channels
+        self.stem_width   = stem_width
+        self.cim_ch       = in_channels * stem_width
+        self.mix_ch       = mix_channels if mix_channels is not None else self.cim_ch
+        self.input_norm   = input_norm
+
+        # ── Phase 1: channel-independent ──────────────────────────────────────
+        self.stem = nn.Sequential(
+            nn.Conv2d(in_channels, self.cim_ch, kernel_size=3, padding=1,
+                      groups=in_channels, bias=False),
+            nn.BatchNorm2d(self.cim_ch),
+            nn.ReLU(inplace=True),
+        )
+
+        sep_layers = []
+        for n_blocks in sep_layer_config:
+            for _ in range(n_blocks):
+                sep_layers.append(ConvBlock(
+                    in_channels=self.cim_ch, groups=in_channels,
+                    block_width=block_width, drop_prob=drop_prob,
+                ))
+            sep_layers.append(nn.AvgPool2d(kernel_size=2, stride=2))
+        self.sep_stages = nn.Sequential(*sep_layers)
+
+        # ── Transition: project to mix_ch with a groups=1 1×1 conv ───────────
+        # This is the first cross-marker operation — cheap because it's 1×1.
+        self.transition = nn.Sequential(
+            nn.BatchNorm2d(self.cim_ch),
+            nn.Conv2d(self.cim_ch, self.mix_ch, kernel_size=1, bias=False),
+            nn.GELU(),
+        )
+
+        # ── Phase 2: full cross-channel ConvBlocks on small spatial map ───────
+        mix_layers = []
+        for _ in range(mix_n_blocks):
+            mix_layers.append(ConvBlock(
+                in_channels=self.mix_ch, groups=1,
+                block_width=block_width, drop_prob=drop_prob,
+            ))
+        self.mix_stages = nn.Sequential(*mix_layers)
+
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+
+    def forward(self, x, *args, **kwargs):
+        if self.input_norm:
+            x = F.normalize(x, dim=1)
+
+        x = self.stem(x)        # [B, C*D, H, W]     — per-marker expansion
+        x = self.sep_stages(x)  # [B, C*D, H', W']   — per-marker, downscaled
+        x = self.transition(x)  # [B, mix_ch, H', W'] — first cross-marker op
+        x = self.mix_stages(x)  # [B, mix_ch, H', W'] — cross-marker refinement
+        x = self.avgpool(x)     # [B, mix_ch, 1, 1]
+        return (x,)
+
+
 class ConvBlock(nn.Module):
     """
     Depthwise-separable ConvNeXt-style block with an FFN and skip connection.
