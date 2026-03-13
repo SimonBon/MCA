@@ -491,7 +491,112 @@ class C_RandomFlip(BaseTransform):
 
         return results
     
-from mmselfsup.structures import SelfSupDataSample  
+@TRANSFORMS.register_module()
+class C_PatientStyleTransfer(BaseTransform):
+    """
+    Augmentation that removes patient-level intensity batch effects by
+    transferring the intensity profile of a randomly drawn target patient.
+
+    For each marker channel c:
+        x_c_new = (x_c - src_mean[c]) / (src_std[c] + eps) * tgt_std[c] + tgt_mean[c]
+
+    This destroys the source patient's absolute intensity fingerprint while
+    preserving within-patch relative structure (which marker is high vs low).
+    Applied independently to each view in MultiView training, forcing VICReg's
+    invariance loss to learn representations that are invariant to patient
+    intensity profiles — analogous to color jitter in natural image SSL.
+
+    Per-patient per-marker statistics are precomputed from the h5 file at init:
+    reads from 'norm_stats' group if present, otherwise scans the full images.
+
+    Args:
+        h5_filepath:   path to the dataset h5 file
+        used_markers:  path to used_markers.txt (comma-separated), or list of names
+        eps:           floor for source std to avoid division by zero
+        clip:          clip output to [0, 1] (recommended)
+    """
+
+    def __init__(self, h5_filepath, used_markers, eps=1e-6, clip=True):
+        super().__init__()
+        self.eps = eps
+        self.clip = clip
+        self._stats = self._load_stats(h5_filepath, used_markers)
+        self.patient_ids = list(self._stats.keys())
+
+    @staticmethod
+    def _load_stats(h5_filepath, used_markers):
+        import h5py
+        from pathlib import Path
+
+        h5_filepath = Path(h5_filepath)
+        with h5py.File(h5_filepath, 'r') as f:
+            all_markers = f['marker_names'][:].astype(str)
+
+            if isinstance(used_markers, (str, Path)):
+                markers = np.loadtxt(used_markers, dtype=str, delimiter=',')
+            else:
+                markers = np.array(used_markers)
+
+            marker2idx = {name: i for i, name in enumerate(all_markers)}
+            used_idx   = np.array(sorted([marker2idx[m] for m in markers]))
+            used_names = all_markers[used_idx]
+
+            stats = {}
+
+            if 'norm_stats' in f:
+                # Fast path: pre-computed stats already in h5
+                for sid in f['norm_stats'].keys():
+                    means = np.array([f['norm_stats'][sid][m]['mean'][()] for m in used_names],
+                                     dtype=np.float32)
+                    stds  = np.array([f['norm_stats'][sid][m]['std'][()]  for m in used_names],
+                                     dtype=np.float32)
+                    stats[sid] = {'mean': means, 'std': stds}
+            else:
+                # Compute from full patient images (one-time cost at init)
+                for sid in f['data'].keys():
+                    img  = f['data'][sid]['image'][:, :, used_idx]   # [H, W, C]
+                    flat = img.reshape(-1, img.shape[-1])             # [H*W, C]
+                    stats[sid] = {
+                        'mean': flat.mean(axis=0).astype(np.float32),
+                        'std':  flat.std(axis=0).astype(np.float32),
+                    }
+
+        print(f"  C_PatientStyleTransfer: loaded stats for {len(stats)} patients "
+              f"({'norm_stats' if 'norm_stats' in open(str(h5_filepath), 'rb').read(200) else 'computed'})")
+        return stats
+
+    def transform(self, results):
+        img    = results['img']                            # [H, W, C]
+        src_id = results['sample_id']
+
+        # pick a different target patient
+        candidates = [p for p in self.patient_ids if p != src_id]
+        tgt_id = candidates[np.random.randint(len(candidates))] if candidates else src_id
+
+        src_mean = self._stats[src_id]['mean']   # [C]
+        src_std  = self._stats[src_id]['std']    # [C]
+        tgt_mean = self._stats[tgt_id]['mean']   # [C]
+        tgt_std  = self._stats[tgt_id]['std']    # [C]
+
+        # For channels with near-zero source std, shift only (avoid amplifying noise)
+        has_signal = src_std > self.eps
+        scale = np.where(has_signal, tgt_std / (src_std + self.eps), 1.0)
+        shift = np.where(has_signal,
+                         tgt_mean - src_mean * scale,
+                         tgt_mean - src_mean)
+
+        img = img * scale[None, None, :] + shift[None, None, :]
+
+        if self.clip:
+            img = np.clip(img, 0.0, 1.0)
+
+        results['img'] = img.astype(np.float32)
+        results['style_source'] = src_id
+        results['style_target'] = tgt_id
+        return results
+
+
+from mmselfsup.structures import SelfSupDataSample
 
 @TRANSFORMS.register_module()
 class C_PackInputs(BaseTransform):
