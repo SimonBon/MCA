@@ -120,7 +120,7 @@ def main():
         print(f"  GT std  (first 5 markers): {gt_std[:5].round(4)}")
 
         # Benchmark different sample sizes
-        sample_sizes = [500, 1000, 2000, 5000, 10000, 20000, 50000]
+        sample_sizes = [500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000]
         sample_sizes = [s for s in sample_sizes if s < total_pixels]
 
         results_strip = []
