@@ -554,37 +554,26 @@ class C_PatientStyleTransfer(BaseTransform):
                     stats[sid] = {'mean': means, 'std': stds}
                 print(f"  C_PatientStyleTransfer: loaded norm_stats for {len(stats)} patients")
             else:
-                # Sample patches from the coord index — avoids reading full tissue images
-                DIM1       = f['coords']['DIM1'][:]
-                DIM2       = f['coords']['DIM2'][:]
-                sample_ids = f['coords']['sample_id'][:].astype(str)
-                half       = 12  # patch half-size for stat estimation
-
-                for sid in np.unique(sample_ids):
-                    mask   = sample_ids == sid
-                    s_dim1 = DIM1[mask]
-                    s_dim2 = DIM2[mask]
-                    n      = min(n_sample_per_patient, len(s_dim1))
-                    idx    = np.random.choice(len(s_dim1), n, replace=False)
-
-                    img    = f['data'][sid]['image']
-                    H, W   = img.shape[:2]
-                    patches = []
-                    for i in idx:
-                        d1 = int(s_dim1[i])
-                        d2 = int(s_dim2[i])
-                        r0, r1 = max(0, d1 - half), min(H, d1 + half)
-                        c0, c1 = max(0, d2 - half), min(W, d2 + half)
-                        patches.append(img[r0:r1, c0:c1, used_idx].reshape(-1, len(used_idx)))
-
-                    flat = np.concatenate(patches, axis=0).astype(np.float32)
+                # Read a contiguous strip from each patient's image — one large
+                # sequential HDF5 read per patient (fast on network storage) rather
+                # than thousands of random patch reads.
+                for sid in f['data'].keys():
+                    img       = f['data'][sid]['image']
+                    H, W      = img.shape[:2]
+                    # Take enough rows to get >= n_sample_per_patient pixels
+                    n_rows    = min(H, max(1, int(np.ceil(n_sample_per_patient / W))))
+                    chunk     = img[:n_rows, :, used_idx].astype(np.float32)  # one sequential read
+                    flat      = chunk.reshape(-1, len(used_idx))
+                    if len(flat) > n_sample_per_patient:
+                        idx  = np.random.choice(len(flat), n_sample_per_patient, replace=False)
+                        flat = flat[idx]
                     stats[sid] = {
                         'mean': flat.mean(axis=0),
                         'std':  flat.std(axis=0),
                     }
 
-                print(f"  C_PatientStyleTransfer: computed stats from {n_sample_per_patient} "
-                      f"patches/patient for {len(stats)} patients")
+                print(f"  C_PatientStyleTransfer: computed stats from contiguous strip "
+                      f"for {len(stats)} patients")
 
         return stats
 
