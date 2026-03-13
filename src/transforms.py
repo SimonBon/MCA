@@ -516,15 +516,16 @@ class C_PatientStyleTransfer(BaseTransform):
         clip:          clip output to [0, 1] (recommended)
     """
 
-    def __init__(self, h5_filepath, used_markers, eps=1e-6, clip=True):
+    def __init__(self, h5_filepath, used_markers, eps=1e-6, clip=True,
+                 n_sample_per_patient=5000):
         super().__init__()
         self.eps = eps
         self.clip = clip
-        self._stats = self._load_stats(h5_filepath, used_markers)
+        self._stats = self._load_stats(h5_filepath, used_markers, n_sample_per_patient)
         self.patient_ids = list(self._stats.keys())
 
     @staticmethod
-    def _load_stats(h5_filepath, used_markers):
+    def _load_stats(h5_filepath, used_markers, n_sample_per_patient=5000):
         import h5py
         from pathlib import Path
 
@@ -551,18 +552,40 @@ class C_PatientStyleTransfer(BaseTransform):
                     stds  = np.array([f['norm_stats'][sid][m]['std'][()]  for m in used_names],
                                      dtype=np.float32)
                     stats[sid] = {'mean': means, 'std': stds}
+                print(f"  C_PatientStyleTransfer: loaded norm_stats for {len(stats)} patients")
             else:
-                # Compute from full patient images (one-time cost at init)
-                for sid in f['data'].keys():
-                    img  = f['data'][sid]['image'][:, :, used_idx]   # [H, W, C]
-                    flat = img.reshape(-1, img.shape[-1])             # [H*W, C]
+                # Sample patches from the coord index — avoids reading full tissue images
+                DIM1       = f['coords']['DIM1'][:]
+                DIM2       = f['coords']['DIM2'][:]
+                sample_ids = f['coords']['sample_id'][:].astype(str)
+                half       = 12  # patch half-size for stat estimation
+
+                for sid in np.unique(sample_ids):
+                    mask   = sample_ids == sid
+                    s_dim1 = DIM1[mask]
+                    s_dim2 = DIM2[mask]
+                    n      = min(n_sample_per_patient, len(s_dim1))
+                    idx    = np.random.choice(len(s_dim1), n, replace=False)
+
+                    img    = f['data'][sid]['image']
+                    H, W   = img.shape[:2]
+                    patches = []
+                    for i in idx:
+                        d1 = int(s_dim1[i])
+                        d2 = int(s_dim2[i])
+                        r0, r1 = max(0, d1 - half), min(H, d1 + half)
+                        c0, c1 = max(0, d2 - half), min(W, d2 + half)
+                        patches.append(img[r0:r1, c0:c1, used_idx].reshape(-1, len(used_idx)))
+
+                    flat = np.concatenate(patches, axis=0).astype(np.float32)
                     stats[sid] = {
-                        'mean': flat.mean(axis=0).astype(np.float32),
-                        'std':  flat.std(axis=0).astype(np.float32),
+                        'mean': flat.mean(axis=0),
+                        'std':  flat.std(axis=0),
                     }
 
-        print(f"  C_PatientStyleTransfer: loaded stats for {len(stats)} patients "
-              f"({'norm_stats' if 'norm_stats' in open(str(h5_filepath), 'rb').read(200) else 'computed'})")
+                print(f"  C_PatientStyleTransfer: computed stats from {n_sample_per_patient} "
+                      f"patches/patient for {len(stats)} patients")
+
         return stats
 
     def transform(self, results):
