@@ -12,6 +12,16 @@ batch_size  = 512
 num_workers = 16
 mask_patch  = True
 
+# ── Override dataset paths for cemm ──────────────────────────────────────────
+_DATA = '/nobackup/lab_taschner-mandl/simongutwein/h5_files/MIBI_TNBC'
+_base_.h5_filepath    = f'{_DATA}/MIBI_TNBC.h5'
+_base_.used_markers   = f'{_DATA}/used_markers.txt'
+_base_.train_indicies = f'{_DATA}/train.txt'
+_base_.val_indicies   = f'{_DATA}/val.txt'
+_base_.test_indicies  = f'{_DATA}/test.txt'
+_base_.dataset['h5_filepath']  = _base_.h5_filepath
+_base_.dataset['used_markers'] = _base_.used_markers
+
 # ── Optimiser: LARS (matching PatientST / paper reference) ───────────────────
 n_linear = 400
 n_cosine = 3600   # 4000 total
