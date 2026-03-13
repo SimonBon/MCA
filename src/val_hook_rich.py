@@ -161,8 +161,9 @@ class EvaluateModelRich(Hook):
         loss     = np.array([r.get('loss',     np.nan) for r in records])
         loss_inv = np.array([r.get('loss_inv', np.nan) for r in records])
         loss_var = np.array([r.get('loss_var', np.nan) for r in records])
-        loss_cov = np.array([r.get('loss_cov', np.nan) for r in records])
-        lr       = np.array([r.get('lr',       np.nan) for r in records])
+        loss_cov   = np.array([r.get('loss_cov',   np.nan) for r in records])
+        loss_align = np.array([r.get('loss_align', np.nan) for r in records])
+        lr         = np.array([r.get('lr',         np.nan) for r in records])
 
         def smooth(arr, w):
             kernel = np.ones(w) / w
@@ -172,21 +173,26 @@ class EvaluateModelRich(Hook):
         loss_s     = smooth(loss,     smooth_window)
         loss_inv_s = smooth(loss_inv, smooth_window)
         loss_var_s = smooth(loss_var, smooth_window)
-        loss_cov_s = smooth(loss_cov, smooth_window)
+        loss_cov_s   = smooth(loss_cov,   smooth_window)
+        loss_align_s = smooth(loss_align, smooth_window)
 
         n       = len(steps)
         zoom_i  = int(n * (1 - zoom_frac))
         alpha_r = 0.15
         zs      = steps[zoom_i:]
 
+        has_align = not np.all(np.isnan(loss_align)) and np.nanmax(loss_align) > 0
+        n_comp = 4 if has_align else 3
+
         fig = plt.figure(figsize=(14, 13))
-        gs  = fig.add_gridspec(3, 3, hspace=0.50, wspace=0.35,
+        gs  = fig.add_gridspec(3, n_comp, hspace=0.50, wspace=0.35,
                                height_ratios=[1, 1, 1])
         ax_full = fig.add_subplot(gs[0, :])
         ax_zoom = fig.add_subplot(gs[1, :])
         ax_inv  = fig.add_subplot(gs[2, 0])
         ax_var  = fig.add_subplot(gs[2, 1])
         ax_cov  = fig.add_subplot(gs[2, 2])
+        ax_aln  = fig.add_subplot(gs[2, 3]) if has_align else None
 
         # ── Row 0: full curve, log y ───────────────────────────────────────
         ax = ax_full
@@ -234,6 +240,8 @@ class EvaluateModelRich(Hook):
         _comp_subplot(ax_inv, loss_inv, loss_inv_s, f'invariance  (last {int(zoom_frac*100)}%)', 'C0')
         _comp_subplot(ax_var, loss_var, loss_var_s, f'variance    (last {int(zoom_frac*100)}%)', 'C1')
         _comp_subplot(ax_cov, loss_cov, loss_cov_s, f'covariance  (last {int(zoom_frac*100)}%)', 'C2')
+        if has_align:
+            _comp_subplot(ax_aln, loss_align, loss_align_s, f'alignment   (last {int(zoom_frac*100)}%)', 'C3')
         ax_inv.set_ylabel('loss')
 
         out = os.path.join(work_dir, 'loss_curve.png')
