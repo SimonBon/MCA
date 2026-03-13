@@ -96,33 +96,29 @@ class MVVICReg(BaseModel):
         **kwargs,
     ) -> Dict[str, torch.Tensor]:
 
-        assert len(inputs) == 2, (
-            f"VICReg expects exactly 2 views, got {len(inputs)}. "
+        assert len(inputs) >= 2, (
+            f"VICReg expects at least 2 views, got {len(inputs)}. "
             "Check your augmentation pipeline."
         )
 
-        # Backbone + neck for both views  →  z1, z2: [B, D]
-        z1 = self.neck(self.backbone(inputs[0].to(self.device)))[0]
-        z2 = self.neck(self.backbone(inputs[1].to(self.device)))[0]
+        # Backbone + neck for all views  →  list of [B, D]
+        zs = [
+            torch.cat(GatherLayer.apply(
+                self.neck(self.backbone(x.to(self.device)))[0]
+            ), dim=0)
+            for x in inputs
+        ]
 
-        # Gather across GPUs (no-op in single-GPU mode)
-        z1 = torch.cat(GatherLayer.apply(z1), dim=0)
-        z2 = torch.cat(GatherLayer.apply(z2), dim=0)
+        # ── Invariance loss: mean MSE over all unique pairs ────────────
+        n_views = len(zs)
+        pairs = [(i, j) for i in range(n_views) for j in range(i + 1, n_views)]
+        loss_inv = sum(F.mse_loss(zs[i], zs[j]) for i, j in pairs) / len(pairs)
 
-        # ── Invariance loss ───────────────────────────────────────────
-        loss_inv = F.mse_loss(z1, z2)
+        # ── Variance loss: mean over all views ────────────────────────
+        loss_var = sum(self._variance_loss(z, self.gamma) for z in zs) / n_views
 
-        # ── Variance loss ─────────────────────────────────────────────
-        loss_var = (
-            self._variance_loss(z1, self.gamma)
-            + self._variance_loss(z2, self.gamma)
-        )
-
-        # ── Covariance loss ───────────────────────────────────────────
-        loss_cov = (
-            self._covariance_loss(z1)
-            + self._covariance_loss(z2)
-        )
+        # ── Covariance loss: mean over all views ──────────────────────
+        loss_cov = sum(self._covariance_loss(z) for z in zs) / n_views
 
         total = (
             self.sim_coeff * loss_inv

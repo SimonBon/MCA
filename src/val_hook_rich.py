@@ -58,10 +58,7 @@ class EvaluateModelRich(Hook):
             max_samples=None,
             knn_k=15,
             silhouette_max_samples=10_000,
-            n_jobs=4,
-            le_fractions=(0.01, 0.1),
-            le_n_per_class=(10, 50, 100, 200, 1000),
-            le_n_repeats=3):
+            n_jobs=4):
 
         super().__init__()
 
@@ -73,9 +70,6 @@ class EvaluateModelRich(Hook):
         self.knn_k = knn_k
         self.silhouette_max_samples = silhouette_max_samples
         self.n_jobs = n_jobs
-        self.le_fractions   = list(le_fractions)
-        self.le_n_per_class = list(le_n_per_class)
-        self.le_n_repeats   = le_n_repeats
 
         base_dataset = dict(type='MCIDataset', pipeline=pipeline)
         base_dataset.update(dataset_kwargs)
@@ -430,6 +424,10 @@ class EvaluateModelRich(Hook):
             'feature_dim': int(train_feats.shape[1]),
         }
 
+        def _save_metrics():
+            with open(f'{work_dir}/metrics.json', 'w') as f:
+                json.dump(metrics, f, indent=2)
+
         # ── 1. Linear Probe ────────────────────────────────────────────────
         print("\n=== 1. Linear Probe ===")
         clf = LogisticRegression(
@@ -476,6 +474,7 @@ class EvaluateModelRich(Hook):
             cls: round(float(per_class_ap[i]), 4) for i, cls in enumerate(classes)
         }
         print(f"  Val mean AP:      {mean_ap:.4f}")
+        _save_metrics()
 
         # ── 2. k-NN ────────────────────────────────────────────────────────
         print(f"\n=== 2. k-NN (k={self.knn_k}, cosine, distance-weighted) ===")
@@ -493,6 +492,7 @@ class EvaluateModelRich(Hook):
             },
         }
         print(f"  Val balanced acc: {metrics['knn']['val']['top1_balanced_accuracy']:.4f}")
+        _save_metrics()
 
         # ── 3. k-means → NMI / ARI ────────────────────────────────────────
         print(f"\n=== 3. k-means Clustering (k={n_classes}) ===")
@@ -516,6 +516,7 @@ class EvaluateModelRich(Hook):
         }
         print(f"  Val NMI: {metrics['clustering']['val']['nmi']:.4f}  |  "
               f"Val ARI: {metrics['clustering']['val']['ari']:.4f}")
+        _save_metrics()
 
         # ── 4. Neighbourhood Purity ────────────────────────────────────────
         # Raw purity is biased against rare classes: a class with 1% prevalence
@@ -558,6 +559,7 @@ class EvaluateModelRich(Hook):
             'per_class':   per_class_purity,
         }
         print(f"  Mean neighbourhood purity: {mean_purity:.4f}  |  Mean lift: {mean_lift:.2f}x")
+        _save_metrics()
 
         # ── 5. Silhouette Score ────────────────────────────────────────────
         print(f"\n=== 5. Silhouette Score (cosine, "
@@ -568,6 +570,7 @@ class EvaluateModelRich(Hook):
                                          metric='cosine'))
         metrics['silhouette'] = {'score': sil, 'n_samples': n_sil, 'metric': 'cosine'}
         print(f"  Silhouette: {sil:.4f}")
+        _save_metrics()
 
         # ── 6. Confusion Matrix (linear probe) ────────────────────────────
         val_pred_str_lr = le.inverse_transform(val_pred_lr)
@@ -655,6 +658,7 @@ class EvaluateModelRich(Hook):
         else:
             print("\nSkipping UMAP — install with: pip install umap-learn")
             metrics['umap'] = {'saved': False, 'reason': 'umap-learn not installed'}
+        _save_metrics()
 
         # ── Save feature arrays ────────────────────────────────────────────
         np.savez_compressed(
@@ -672,42 +676,8 @@ class EvaluateModelRich(Hook):
             classes=le.classes_,
         )
 
-        # ── Save metrics.json ──────────────────────────────────────────────
-        # Mirror top-level 'train'/'val' keys from linear probe for backwards compat
-        metrics['train'] = metrics['linear_probe']['train']
-        metrics['val']   = metrics['linear_probe']['val']
-
-        with open(f'{work_dir}/metrics.json', 'w') as f:
-            json.dump(metrics, f, indent=2)
-
         # ── Loss curve ────────────────────────────────────────────────────
         self._plot_loss_curve(work_dir)
-
-        # ── Label efficiency ──────────────────────────────────────────────
-        lp_val = metrics['linear_probe']['val']
-        full_lp_point = {
-            'label':        '100%',
-            'n_labeled':    len(train_labels),
-            'n_repeats':    1,
-            'bal_acc_mean': lp_val['top1_balanced_accuracy'],
-            'bal_acc_std':  0.0,
-            'mean_ap_mean': lp_val.get('mean_average_precision', float('nan')),
-            'mean_ap_std':  0.0,
-            'bal_acc_runs': [lp_val['top1_balanced_accuracy']],
-            'mean_ap_runs': [lp_val.get('mean_average_precision', float('nan'))],
-        }
-        self._label_efficiency(
-            train_feats=train_feats, train_labels=train_labels,
-            val_feats=val_feats,     val_labels=val_labels,
-            classes=classes,         n_classes=n_classes,
-            work_dir=work_dir,
-            fractions=self.le_fractions,
-            n_per_class=self.le_n_per_class,
-            n_repeats=self.le_n_repeats,
-            epochs=self.epochs,
-            n_jobs=self.n_jobs,
-            full_lp_point=full_lp_point,
-        )
 
         # ── Summary print ──────────────────────────────────────────────────
         lp  = metrics['linear_probe']['val']
