@@ -577,7 +577,30 @@ class EvaluateModelRich(Hook):
         sil     = float(silhouette_score(val_feats[sil_idx], val_labels[sil_idx],
                                          metric='cosine'))
         metrics['silhouette'] = {'score': sil, 'n_samples': n_sil, 'metric': 'cosine'}
-        print(f"  Silhouette: {sil:.4f}")
+        print(f"  Silhouette (cell type): {sil:.4f}")
+
+        # ── Sample integration score ───────────────────────────────────────
+        # Silhouette by sample ID, negated: +1 = fully mixed, -1 = fully separated
+        # Requires >= 2 unique samples in val set
+        unique_sample_ids = np.unique(val_ids[sil_idx])
+        if len(unique_sample_ids) >= 2:
+            sil_sample_raw = float(silhouette_score(
+                val_feats[sil_idx], val_ids[sil_idx], metric='cosine'
+            ))
+            sample_integration = -sil_sample_raw
+        else:
+            sil_sample_raw     = float('nan')
+            sample_integration = float('nan')
+
+        metrics['sample_integration'] = {
+            'score':              sample_integration,
+            'silhouette_by_sample': sil_sample_raw,
+            'n_samples':          n_sil,
+            'metric':             'cosine',
+            'note':               '+1=fully mixed, -1=fully separated',
+        }
+        print(f"  Sample integration:     {sample_integration:.4f}  "
+              f"(silhouette-by-sample: {sil_sample_raw:.4f})")
         _save_metrics()
 
         # ── 6. Confusion Matrix (linear probe) ────────────────────────────
@@ -699,7 +722,8 @@ class EvaluateModelRich(Hook):
 ║  k-NN (k={self.knn_k:2d})    bal-acc  {knn['top1_balanced_accuracy']:.4f}   F1 {knn['f1']:.4f}  ║
 ║  Clustering    NMI      {cl['nmi']:.4f}   ARI {cl['ari']:.4f} ║
 ║  Nbhd purity  raw {mean_purity:.4f}  lift {mean_lift:.2f}x           ║
-║  Silhouette            {sil:.4f}                  ║
+║  Silhouette (cell type)        {sil:.4f}              ║
+║  Sample integration (+1=mixed) {sample_integration:.4f}              ║
 ╚══════════════════════════════════════════════════╝
 """)
         print(f"Saved metrics to {work_dir}/metrics.json")
