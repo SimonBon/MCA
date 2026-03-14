@@ -86,10 +86,18 @@ def extract_features(h5_path, marker_indices, dim1, dim2, sample_ids,
                 print(f'  {i}/{len(dim1)}', flush=True)
 
             grp = groups[sid]
+            H_img, W_img = grp['image'].shape[:2]
             r0, r1 = d1 - half, d1 + half
             c0, c1 = d2 - half, d2 + half
-            patch = grp['image'][r0:r1, c0:c1, :][:, :, marker_indices].astype(np.float32)
-            mask  = grp['masks'][r0:r1, c0:c1]
+            # clamp to image bounds and zero-pad like dataset._get_patch
+            r0c, r1c = max(0, r0), min(H_img, r1)
+            c0c, c1c = max(0, c0), min(W_img, c1)
+            chunk = grp['image'][r0c:r1c, c0c:c1c, :][:, :, marker_indices].astype(np.float32)
+            patch = np.zeros((patch_size, patch_size, len(marker_indices)), dtype=np.float32)
+            patch[r0c - r0:r1c - r0, c0c - c0:c1c - c0, :] = chunk
+            chunk_m = grp['masks'][r0c:r1c, c0c:c1c]
+            mask = np.zeros((patch_size, patch_size), dtype=chunk_m.dtype)
+            mask[r0c - r0:r1c - r0, c0c - c0:c1c - c0] = chunk_m
 
             # keep only pixels belonging to the centre cell
             centre_label = mask[half, half]
