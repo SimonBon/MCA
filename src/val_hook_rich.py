@@ -38,7 +38,7 @@ class EvaluateModelRich(Hook):
         3. k-means          — unsupervised clustering quality (NMI / ARI)
         4. Neighbourhood purity — fraction of k nearest neighbours sharing
                                   the same cell-type label
-        5. Silhouette score — cluster compactness in cosine space
+        5. Sample integration — how well patient samples are mixed in embedding space
         6. UMAP plot        — 2-D visualisation coloured by cell type (requires
                               umap-learn; skipped gracefully if missing)
 
@@ -569,19 +569,13 @@ class EvaluateModelRich(Hook):
         print(f"  Mean neighbourhood purity: {mean_purity:.4f}  |  Mean lift: {mean_lift:.2f}x")
         _save_metrics()
 
-        # ── 5. Silhouette Score ────────────────────────────────────────────
-        print(f"\n=== 5. Silhouette Score (cosine, "
+        # ── 5. Sample integration score ───────────────────────────────────
+        # Silhouette by sample ID, negated: +1 = fully mixed, -1 = fully separated
+        print(f"\n=== 5. Sample Integration (cosine, "
               f"max {self.silhouette_max_samples} samples) ===")
         n_sil   = min(self.silhouette_max_samples, len(val_feats))
         sil_idx = np.random.default_rng().choice(len(val_feats), n_sil, replace=False)
-        sil     = float(silhouette_score(val_feats[sil_idx], val_labels[sil_idx],
-                                         metric='cosine'))
-        metrics['silhouette'] = {'score': sil, 'n_samples': n_sil, 'metric': 'cosine'}
-        print(f"  Silhouette (cell type): {sil:.4f}")
 
-        # ── Sample integration score ───────────────────────────────────────
-        # Silhouette by sample ID, negated: +1 = fully mixed, -1 = fully separated
-        # Requires >= 2 unique samples in val set
         unique_sample_ids = np.unique(val_ids[sil_idx])
         if len(unique_sample_ids) >= 2:
             sil_sample_raw = float(silhouette_score(
@@ -594,13 +588,11 @@ class EvaluateModelRich(Hook):
 
         metrics['sample_integration'] = {
             'score':              sample_integration,
-            'silhouette_by_sample': sil_sample_raw,
             'n_samples':          n_sil,
             'metric':             'cosine',
             'note':               '+1=fully mixed, -1=fully separated',
         }
-        print(f"  Sample integration:     {sample_integration:.4f}  "
-              f"(silhouette-by-sample: {sil_sample_raw:.4f})")
+        print(f"  Sample integration:     {sample_integration:.4f}")
         _save_metrics()
 
         # ── 6. Confusion Matrix (linear probe) ────────────────────────────
@@ -722,7 +714,6 @@ class EvaluateModelRich(Hook):
 ║  k-NN (k={self.knn_k:2d})    bal-acc  {knn['top1_balanced_accuracy']:.4f}   F1 {knn['f1']:.4f}  ║
 ║  Clustering    NMI      {cl['nmi']:.4f}   ARI {cl['ari']:.4f} ║
 ║  Nbhd purity  raw {mean_purity:.4f}  lift {mean_lift:.2f}x           ║
-║  Silhouette (cell type)        {sil:.4f}              ║
 ║  Sample integration (+1=mixed) {sample_integration:.4f}              ║
 ╚══════════════════════════════════════════════════╝
 """)
