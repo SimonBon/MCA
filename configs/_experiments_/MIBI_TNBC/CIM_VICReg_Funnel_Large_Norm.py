@@ -4,7 +4,7 @@ _base_ = [
     '../../_base_/default.py',
     '../../_base_/val_cfg.py',
     '../../_datasets_/MIBI_TNBC.py',
-    '../../_backbones_/CIM_Funnel_Large_Norm_Norm.py',
+    '../../_backbones_/CIM_Funnel_Large_Norm.py',
     '../../_algorithms_/VICReg.py',
 ]
 
