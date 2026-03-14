@@ -870,7 +870,7 @@ class MixBlock(nn.Module):
     Key differences from ConvBlock:
       - Spatial conv is depthwise (groups=in_channels), channel mixing is purely
         in the FFN 1×1 convs — clean separation of concerns.
-      - 5×5 kernel: at 5×5 spatial resolution this covers the whole map.
+      - 3×3 depthwise kernel for spatial mixing.
       - LayerNorm (channel-wise) instead of BatchNorm.
       - Layer Scale γ (init=1e-6): learnable per-channel scalar on the residual
         branch — stabilises training of deeper stacks.
@@ -887,10 +887,10 @@ class MixBlock(nn.Module):
 
         hidden = in_channels * block_width
 
-        # Depthwise 5×5 — pure spatial mixing, one filter per channel
+        # Depthwise 3×3 — pure spatial mixing, one filter per channel
         self.dw_conv = nn.Conv2d(
             in_channels, in_channels,
-            kernel_size=5, padding=2,
+            kernel_size=3, padding=1,
             groups=in_channels, bias=False,
         )
         # LayerNorm over channel dim (applied after permute)
