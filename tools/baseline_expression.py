@@ -343,6 +343,25 @@ def main():
         metrics['umap'] = {'saved': False}
     save()
 
+    # ── Save feature arrays ───────────────────────────────────────────────────
+    val_pred_lr  = clf.predict(val_feats)
+    train_pred_lr = clf.predict(train_feats)
+    np.savez_compressed(
+        out_dir / 'val_results.npz',
+        features=val_feats, labels_str=val_labels,
+        labels_num=val_y, sample_ids=val_ids,
+        top1_pred_lr=val_pred_lr, top1_pred_knn=knn_pred,
+        classes=np.array(classes),
+    )
+    np.savez_compressed(
+        out_dir / 'train_results.npz',
+        features=train_feats, labels_str=train_labels,
+        labels_num=train_y, sample_ids=sample_ids[train_sel],
+        top1_pred_lr=train_pred_lr,
+        classes=np.array(classes),
+    )
+    print(f'Saved feature arrays to {out_dir}')
+
     # ── Summary ───────────────────────────────────────────────────────────────
     lp  = metrics['linear_probe']['val']['top1_balanced_accuracy']
     knn_acc = metrics['knn']['val']['top1_balanced_accuracy']
