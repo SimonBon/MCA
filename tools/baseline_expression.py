@@ -40,6 +40,13 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+try:
+    import umap as umap_lib
+    HAS_UMAP = True
+except ImportError:
+    HAS_UMAP = False
+    print("umap-learn not installed — skipping UMAP")
+
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -289,6 +296,51 @@ def main():
         'note': '+1=fully mixed, -1=fully separated',
     }
     print(f'  sample integration: {sample_integration:.4f}')
+    save()
+
+    # ── 6. UMAP ───────────────────────────────────────────────────────────────
+    if HAS_UMAP:
+        print('\n=== 6. UMAP ===')
+        reducer = umap_lib.UMAP(n_components=2, metric='cosine',
+                                n_neighbors=15, min_dist=0.1,
+                                n_jobs=args.n_jobs, verbose=True)
+        reducer.fit(train_feats)
+        val_emb = reducer.transform(val_feats)
+
+        cmap = plt.get_cmap('tab20', n_classes)
+        fig, ax = plt.subplots(figsize=(10, 8))
+        for i, cls in enumerate(classes):
+            m = val_y == i
+            ax.scatter(val_emb[m, 0], val_emb[m, 1], s=1, alpha=0.4,
+                       color=cmap(i), label=cls, rasterized=True)
+        ax.legend(markerscale=6, bbox_to_anchor=(1.02, 1),
+                  loc='upper left', fontsize=8, frameon=False)
+        ax.set_xlabel('UMAP 1'); ax.set_ylabel('UMAP 2')
+        ax.set_title('Val features — UMAP (cell type)')
+        plt.tight_layout()
+        plt.savefig(out_dir / 'umap.pdf', bbox_inches='tight')
+        plt.close()
+
+        unique_ids = np.unique(val_ids)
+        cmap_s = plt.get_cmap('nipy_spectral', len(unique_ids))
+        id2int = {s: i for i, s in enumerate(unique_ids)}
+        fig2, ax2 = plt.subplots(figsize=(10, 8))
+        for i, sid in enumerate(unique_ids):
+            m = np.array([id2int[s] for s in val_ids]) == i
+            ax2.scatter(val_emb[m, 0], val_emb[m, 1], s=1, alpha=0.4,
+                        color=cmap_s(i), label=str(sid), rasterized=True)
+        if len(unique_ids) <= 30:
+            ax2.legend(markerscale=6, bbox_to_anchor=(1.02, 1),
+                       loc='upper left', fontsize=8, frameon=False, title='Sample ID')
+        ax2.set_xlabel('UMAP 1'); ax2.set_ylabel('UMAP 2')
+        ax2.set_title('Val features — UMAP (sample ID)')
+        plt.tight_layout()
+        plt.savefig(out_dir / 'umap_sample.pdf', bbox_inches='tight')
+        plt.close()
+        print(f'Saved UMAPs to {out_dir}')
+        metrics['umap'] = {'saved': True, 'n_neighbors': 15, 'min_dist': 0.1, 'metric': 'cosine'}
+    else:
+        metrics['umap'] = {'saved': False}
     save()
 
     # ── Summary ───────────────────────────────────────────────────────────────
