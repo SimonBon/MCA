@@ -2,11 +2,11 @@
 #SBATCH --job-name=ExprBaseline
 #SBATCH --output=/home/sgutwein/logs/ExprBaseline_%j.log
 #SBATCH --error=/home/sgutwein/logs/ExprBaseline_%j.log
-#SBATCH --partition=cpu
+#SBATCH --partition=shortq
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=32G
-#SBATCH --time=2:00:00
+#SBATCH --time=4:00:00
 
 source /nobackup/lab_taschner-mandl/simongutwein/miniconda3/etc/profile.d/conda.sh
 conda activate mca310
