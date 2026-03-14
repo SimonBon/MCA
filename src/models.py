@@ -776,12 +776,15 @@ class CIM_Funnel(nn.Module):
             nn.GELU(),
         )
 
-        # ── Phase 2: full cross-channel ConvBlocks on small spatial map ───────
+        # ── Phase 2: ConvNeXt-style MixBlocks on small spatial map ───────────
+        # MixBlock uses depthwise 5×5 (spatial) + LayerNorm + 1×1 FFN (channel)
+        # + LayerScale γ. Cleaner separation than groups=1 ConvBlock.
         mix_layers = []
         for _ in range(mix_n_blocks):
-            mix_layers.append(ConvBlock(
-                in_channels=self.mix_ch, groups=1,
-                block_width=block_width, drop_prob=drop_prob,
+            mix_layers.append(MixBlock(
+                in_channels=self.mix_ch,
+                block_width=block_width,
+                drop_prob=drop_prob,
             ))
         self.mix_stages = nn.Sequential(*mix_layers)
 
@@ -850,6 +853,70 @@ class ConvBlock(nn.Module):
         x = self.pw_expand(x)
         x = self.act(x)
         x = self.pw_project(x)
+        x = self.drop(x)
+
+        return x + identity
+
+
+class MixBlock(nn.Module):
+    """
+    ConvNeXt-style block for the cross-channel mixing phase (Phase 2) of CIM_Funnel.
+
+    Faithfully follows the ConvNeXt design:
+        x → depthwise 5×5 (groups=C, spatial only) → LayerNorm
+          → 1×1 expand (groups=1, channel mixing) → GELU
+          → 1×1 project (groups=1) → LayerScale γ → residual
+
+    Key differences from ConvBlock:
+      - Spatial conv is depthwise (groups=in_channels), channel mixing is purely
+        in the FFN 1×1 convs — clean separation of concerns.
+      - 5×5 kernel: at 5×5 spatial resolution this covers the whole map.
+      - LayerNorm (channel-wise) instead of BatchNorm.
+      - Layer Scale γ (init=1e-6): learnable per-channel scalar on the residual
+        branch — stabilises training of deeper stacks.
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        block_width: int = 4,
+        drop_prob: float = 0.0,
+        layer_scale_init: float = 1e-6,
+    ):
+        super().__init__()
+
+        hidden = in_channels * block_width
+
+        # Depthwise 5×5 — pure spatial mixing, one filter per channel
+        self.dw_conv = nn.Conv2d(
+            in_channels, in_channels,
+            kernel_size=5, padding=2,
+            groups=in_channels, bias=False,
+        )
+        # LayerNorm over channel dim (applied after permute)
+        self.norm = nn.LayerNorm(in_channels)
+
+        # Pointwise FFN — channel mixing
+        self.pw_expand  = nn.Conv2d(in_channels, hidden, kernel_size=1, bias=False)
+        self.act        = nn.GELU()
+        self.pw_project = nn.Conv2d(hidden, in_channels, kernel_size=1, bias=False)
+
+        # Layer Scale: per-channel learnable scalar, init very small
+        self.gamma = nn.Parameter(torch.full((in_channels, 1, 1), layer_scale_init))
+
+        self.drop = nn.Dropout2d(drop_prob) if drop_prob > 0.0 else nn.Identity()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        identity = x
+
+        x = self.dw_conv(x)                          # [B, C, H, W] — spatial mixing
+        x = x.permute(0, 2, 3, 1)                    # [B, H, W, C] for LayerNorm
+        x = self.norm(x)
+        x = x.permute(0, 3, 1, 2)                    # [B, C, H, W]
+        x = self.pw_expand(x)                         # [B, 4C, H, W]
+        x = self.act(x)
+        x = self.pw_project(x)                        # [B, C, H, W]
+        x = self.gamma * x                            # layer scale
         x = self.drop(x)
 
         return x + identity
