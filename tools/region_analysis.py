@@ -71,6 +71,9 @@ def parse_args():
     p.add_argument("--emb_dir",  default=None,
                    help="Directory to store/load embeddings.npz independently of --out. "
                         "Defaults to --out if not set.")
+    p.add_argument("--patient_classes", default=None,
+                   help="CSV file with two columns (patient_id, class) — no header. "
+                        "Enables patient-level UMAP and JS heatmap coloured by class.")
     p.add_argument("--reload", action="store_true",
                    help="Re-embed even if embeddings.npz already exists")
     return p.parse_args()
@@ -344,6 +347,139 @@ def plot_enrichment(comp, labels, global_freq, all_ct, k, save_path,
 
 
 # ---------------------------------------------------------------------------
+# Patient-level analysis
+# ---------------------------------------------------------------------------
+
+def patient_cluster_freqs(labels, meta, unique_sids, k):
+    """Return (n_patients × k) matrix of cluster area fractions per patient."""
+    import numpy as np
+    sid2idx = {}
+    for i, (sid, *_) in enumerate(meta):
+        sid2idx.setdefault(sid, []).append(i)
+    mat = np.zeros((len(unique_sids), k), dtype=np.float32)
+    for pi, sid in enumerate(unique_sids):
+        idx = sid2idx.get(sid, [])
+        if idx:
+            counts = np.bincount(labels[idx], minlength=k).astype(np.float32)
+            mat[pi] = counts / counts.sum()
+    return mat
+
+
+def plot_patient_umap(freq_mat, unique_sids, patient_classes, k, n_jobs, save_path):
+    import numpy as np, matplotlib.pyplot as plt
+    import umap as umap_lib
+
+    class_labels = np.array([patient_classes.get(sid, -1) for sid in unique_sids])
+    unique_classes = sorted(set(class_labels[class_labels >= 0]))
+    cmap = plt.cm.get_cmap("Set1", len(unique_classes))
+
+    xy = umap_lib.UMAP(n_components=2, n_neighbors=min(10, len(unique_sids)-1),
+                       min_dist=0.3, metric="cosine", n_jobs=n_jobs,
+                       random_state=42, verbose=False
+                       ).fit_transform(freq_mat.astype(np.float32))
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+    for ci, cls in enumerate(unique_classes):
+        mask = class_labels == cls
+        ax.scatter(xy[mask, 0], xy[mask, 1], c=[cmap(ci)]*mask.sum(),
+                   label=f"Class {cls} (n={mask.sum()})", s=80, edgecolors="k",
+                   linewidths=0.5, zorder=3)
+    for i, sid in enumerate(unique_sids):
+        ax.annotate(str(sid), xy[i], fontsize=5, ha="center", va="bottom")
+    ax.legend(frameon=True, fontsize=9)
+    ax.set(title="Patient UMAP — spatial cluster frequencies", xlabel="UMAP 1", ylabel="UMAP 2")
+    ax.axis("off")
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"Saved: {save_path}")
+
+
+def plot_patient_js_heatmap(freq_mat, unique_sids, patient_classes, save_path):
+    import numpy as np, matplotlib.pyplot as plt
+    from scipy.spatial.distance import jensenshannon
+
+    n = len(unique_sids)
+    js_mat = np.zeros((n, n), dtype=np.float32)
+    for i in range(n):
+        for j in range(n):
+            p = freq_mat[i] + 1e-9; p /= p.sum()
+            q = freq_mat[j] + 1e-9; q /= q.sum()
+            js_mat[i, j] = float(jensenshannon(p, q))
+
+    class_labels = np.array([patient_classes.get(sid, -1) for sid in unique_sids])
+    order = np.argsort(class_labels)
+    js_sorted = js_mat[np.ix_(order, order)]
+    sids_sorted = [unique_sids[i] for i in order]
+    cls_sorted  = class_labels[order]
+
+    fig, ax = plt.subplots(figsize=(10, 9))
+    im = ax.imshow(js_sorted, cmap="viridis", vmin=0, vmax=js_mat.max())
+    plt.colorbar(im, ax=ax, label="JS divergence", shrink=0.8)
+    ax.set_xticks(range(n)); ax.set_xticklabels(sids_sorted, rotation=90, fontsize=6)
+    ax.set_yticks(range(n)); ax.set_yticklabels(sids_sorted, fontsize=6)
+
+    # Draw class boundary lines
+    for boundary in np.where(np.diff(cls_sorted) != 0)[0]:
+        ax.axhline(boundary + 0.5, color="red", lw=1.5)
+        ax.axvline(boundary + 0.5, color="red", lw=1.5)
+
+    unique_classes = sorted(set(cls_sorted[cls_sorted >= 0]))
+    cmap_cls = plt.cm.get_cmap("Set1", len(unique_classes))
+    for ci, cls in enumerate(unique_classes):
+        positions = np.where(cls_sorted == cls)[0]
+        for pos in positions:
+            ax.get_xticklabels()[pos].set_color(cmap_cls(ci))
+            ax.get_yticklabels()[pos].set_color(cmap_cls(ci))
+
+    ax.set_title("Patient pairwise JS divergence (spatial cluster frequencies)\n"
+                 "sorted by class — red lines = class boundaries", fontsize=10)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"Saved: {save_path}")
+
+
+def plot_patient_cluster_heatmap(freq_mat, unique_sids, patient_classes, k, save_path):
+    """Heatmap: patients × clusters, rows sorted by class."""
+    import numpy as np, matplotlib.pyplot as plt
+
+    class_labels = np.array([patient_classes.get(sid, -1) for sid in unique_sids])
+    order = np.argsort(class_labels)
+    freq_sorted = freq_mat[order]
+    sids_sorted = [unique_sids[i] for i in order]
+    cls_sorted  = class_labels[order]
+
+    unique_classes = sorted(set(cls_sorted[cls_sorted >= 0]))
+    cmap_cls = plt.cm.get_cmap("Set1", len(unique_classes))
+
+    fig, ax = plt.subplots(figsize=(max(8, k * 0.6), max(6, len(unique_sids) * 0.3)))
+    im = ax.imshow(freq_sorted, aspect="auto", cmap="Blues", vmin=0)
+    plt.colorbar(im, ax=ax, label="Fraction of patches", shrink=0.6)
+    ax.set_xticks(range(k)); ax.set_xticklabels([f"C{i}" for i in range(k)], fontsize=8)
+    ax.set_yticks(range(len(unique_sids))); ax.set_yticklabels(sids_sorted, fontsize=7)
+
+    for ci, cls in enumerate(unique_classes):
+        positions = np.where(cls_sorted == cls)[0]
+        for pos in positions:
+            ax.get_yticklabels()[pos].set_color(cmap_cls(ci))
+
+    for boundary in np.where(np.diff(cls_sorted) != 0)[0]:
+        ax.axhline(boundary + 0.5, color="red", lw=1.5)
+
+    import matplotlib.patches as mpatches
+    handles = [mpatches.Patch(color=cmap_cls(ci), label=f"Class {cls}")
+               for ci, cls in enumerate(unique_classes)]
+    ax.legend(handles=handles, loc="upper right", fontsize=8, frameon=True)
+    ax.set_title("Per-patient spatial cluster frequencies (sorted by class)", fontsize=10)
+    ax.set_xlabel("Spatial cluster")
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"Saved: {save_path}")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -475,6 +611,28 @@ def main():
     )
     plot_umap(emb_pca, labels, k, args.n_jobs, args.umap_max, out / "umap.png")
     plot_enrichment(comp, labels, global_freq, all_ct, k, out / "enrichment_heatmap.png")
+
+    # Patient-level analysis (optional)
+    if args.patient_classes:
+        import csv
+        patient_classes = {}
+        with open(args.patient_classes) as fh:
+            for row in csv.reader(fh):
+                if len(row) >= 2:
+                    patient_classes[row[0].strip()] = int(row[1].strip())
+
+        freq_mat = patient_cluster_freqs(labels, meta, unique_sids, k)
+        np.save(out / "patient_cluster_freqs.npy", freq_mat)
+        with open(out / "patient_cluster_freqs.json", "w") as fh:
+            json.dump({sid: freq_mat[i].tolist()
+                       for i, sid in enumerate(unique_sids)}, fh, indent=2)
+
+        plot_patient_umap(freq_mat, unique_sids, patient_classes, k,
+                          args.n_jobs, out / "patient_umap.png")
+        plot_patient_js_heatmap(freq_mat, unique_sids, patient_classes,
+                                out / "patient_js_heatmap.png")
+        plot_patient_cluster_heatmap(freq_mat, unique_sids, patient_classes,
+                                     k, out / "patient_cluster_heatmap.png")
 
     # Summary
     from scipy.spatial.distance import jensenshannon

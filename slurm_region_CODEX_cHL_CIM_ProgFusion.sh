@@ -16,11 +16,11 @@ conda activate mca310
 BASE=/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper
 H5=/nobackup/lab_taschner-mandl/simongutwein/h5_files/CODEX_cHL/CODEX_cHL.h5
 MARKERS=/nobackup/lab_taschner-mandl/simongutwein/h5_files/CODEX_cHL/used_markers.txt
-OUT=/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/region_analysis/CODEX_cHL_CIM_ProgFusion_ps128
+OUT=/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/region_analysis/CODEX_cHL_CIM_ProgFusion_ps64
 
 mkdir -p "$OUT"
 
-EMB=/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/region_analysis/embeddings/CODEX_cHL_CIM_ProgFusion_ps128
+EMB=/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/region_analysis/embeddings/CODEX_cHL_CIM_ProgFusion_ps64
 
 python /home/sgutwein/src/MCA/tools/region_analysis.py \
     --model_dir  "$BASE/CODEX_cHL/CIM_ProgFusion" \
@@ -28,8 +28,8 @@ python /home/sgutwein/src/MCA/tools/region_analysis.py \
     --markers    "$MARKERS" \
     --out        "$OUT" \
     --emb_dir    "$EMB" \
-    --patch_size 128 \
+    --patch_size 64 \
     --k          500 \
-    --batch_size 32 \
+    --batch_size 64 \
     --n_jobs     8 \
-    --display_markers Cytokeritin CD3 CD68 Vimentin DAPI-01 CD20
+    --display_markers CD30 CD20 CD4 CD8 CD68 PD-L1 DAPI-01
