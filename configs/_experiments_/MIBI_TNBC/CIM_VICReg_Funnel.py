@@ -24,7 +24,7 @@ _base_.dataset['used_markers'] = _base_.used_markers
 
 # ── Optimiser: LARS (matching PatientST / paper reference) ───────────────────
 n_linear = 400
-n_cosine = 3600   # 4000 total
+n_cosine = 7600   # 8000 total
 
 optimizer = dict(type='LARS', lr=0.3, momentum=0.9, weight_decay=1e-5)
 optim_wrapper = dict(type='OptimWrapper', optimizer=optimizer)
@@ -102,4 +102,4 @@ _base_.model.backbone             = _base_.backbone
 _base_.model.backbone.in_channels = _base_.n_markers
 _base_.model.neck.in_channels     = _base_.mix_channels   # 256, set in CIM_Funnel.py
 
-work_dir = '/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/MIBI_TNBC_CIM_VICReg_Funnel'
+work_dir = '/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/MIBI_TNBC_CIM_VICReg_Funnel_8k'
