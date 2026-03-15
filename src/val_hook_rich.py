@@ -57,6 +57,7 @@ class EvaluateModelRich(Hook):
             annotation_map=None,
             max_samples=None,
             knn_k=15,
+            lisi_k=90,
             silhouette_max_samples=10_000,
             n_jobs=4):
 
@@ -68,6 +69,7 @@ class EvaluateModelRich(Hook):
         self.epochs = epochs
         self._max_samples = max_samples if max_samples is not None else float('inf')
         self.knn_k = knn_k
+        self.lisi_k = lisi_k
         self.silhouette_max_samples = silhouette_max_samples
         self.n_jobs = n_jobs
 
@@ -611,9 +613,11 @@ class EvaluateModelRich(Hook):
         # cLISI ∈ [1, N_types]: 1 = every neighbour same type (compact),
         # N_types = perfectly mixed (no structure).
         # Normalised cLISI = (cLISI - 1) / (N_types - 1) ∈ [0, 1], lower = better.
-        print(f"\n=== 5. cLISI — cell-type compactness (k={self.knn_k}) ===")
+        # k=90 follows Harmony paper standard — large enough to be discriminative.
+        lisi_k = min(self.lisi_k, len(val_feats) - 1)
+        print(f"\n=== 5. cLISI — cell-type compactness (k={lisi_k}) ===")
         clisi_vals = self._compute_lisi(val_feats, val_labels_str,
-                                        n_neighbors=self.knn_k, metric='cosine')
+                                        n_neighbors=lisi_k, metric='cosine')
         clisi_mean = float(np.mean(clisi_vals))
         clisi_norm = float((clisi_mean - 1) / max(n_classes - 1, 1))
         per_class_clisi = {
@@ -622,7 +626,7 @@ class EvaluateModelRich(Hook):
             if (val_labels == c).sum() > 0
         }
         metrics['clisi'] = {
-            'k':           self.knn_k,
+            'k':           lisi_k,
             'mean':        clisi_mean,
             'normalised':  clisi_norm,
             'note':        'normalised: 0=compact, 1=random; lower is better',
@@ -635,14 +639,14 @@ class EvaluateModelRich(Hook):
         # iLISI ∈ [1, N_samples]: 1 = all neighbours same sample (not mixed),
         # N_samples = perfectly mixed.
         # Normalised iLISI = (iLISI - 1) / (N_samples - 1) ∈ [0, 1], higher = better.
-        print(f"\n=== 6. iLISI — sample integration (k={self.knn_k}) ===")
+        print(f"\n=== 6. iLISI — sample integration (k={lisi_k}) ===")
         n_unique_samples = len(np.unique(val_ids))
         ilisi_vals = self._compute_lisi(val_feats, val_ids,
-                                        n_neighbors=self.knn_k, metric='cosine')
+                                        n_neighbors=lisi_k, metric='cosine')
         ilisi_mean = float(np.mean(ilisi_vals))
         ilisi_norm = float((ilisi_mean - 1) / max(n_unique_samples - 1, 1))
         metrics['ilisi'] = {
-            'k':              self.knn_k,
+            'k':              lisi_k,
             'mean':           ilisi_mean,
             'normalised':     ilisi_norm,
             'n_unique_samples': n_unique_samples,
