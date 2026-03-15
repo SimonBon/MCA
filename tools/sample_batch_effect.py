@@ -248,18 +248,13 @@ for m_idx, mname in enumerate(show_markers):
         if m_idx == 0:
             ax.set_title(f's{sid}', fontsize=5.5, color=REF_COL)
 
-# Row header labels: "Sample 41" and "Reference"
-mid_t = (n_p - 1) / 2 / (2 * n_p)
-mid_r = (n_p + 1 + (n_p - 1) / 2) / (2 * n_p + 1)  # approx
-
-fig.text(0.5 * (gs_bot.left + gs_bot.left + n_p / (2 * n_p + 1) * (gs_bot.right - gs_bot.left)),
-         gs_bot.top + 0.015,
-         f'Sample {TARGET}  ({representative_ct})',
+# Row header labels using fixed fractional x positions
+# target group occupies columns 0..n_p-1, reference n_p+1..2*n_p out of 2*n_p+1 total cols
+frac_t = (n_p / 2) / (2 * n_p + 1)
+frac_r = (n_p + 1 + n_p / 2) / (2 * n_p + 1)
+fig.text(frac_t, 0.455, f'Sample {TARGET}  ({representative_ct})',
          ha='center', va='bottom', fontsize=9, fontweight='bold', color=TARGET_COL)
-fig.text(0.5 * (gs_bot.left + (n_p + 0.5 + n_p / 2) / (2 * n_p + 1) * (gs_bot.right - gs_bot.left) +
-                gs_bot.right),
-         gs_bot.top + 0.015,
-         f'Reference  (other samples, same cell type)',
+fig.text(frac_r, 0.455, 'Reference  (other samples, same cell type)',
          ha='center', va='bottom', fontsize=9, fontweight='bold', color=REF_COL)
 
 fig.text(0.5, 0.45,
