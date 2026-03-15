@@ -10,7 +10,7 @@ _base_ = [
 
 batch_size  = 256   # H100 PCIe (80GB) — 6 views × 37 markers × 512ch
 num_workers = 16
-mask_patch  = True
+mask_patch  = False
 
 # ── Override dataset paths for cemm ──────────────────────────────────────────
 _DATA = '/nobackup/lab_taschner-mandl/simongutwein/h5_files/MIBI_TNBC'
