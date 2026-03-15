@@ -4,7 +4,7 @@
 #SBATCH --error=/home/sgutwein/logs/Funnel_4v_NoMask_%j.log
 #SBATCH --partition=gpu
 #SBATCH --qos=gpu
-#SBATCH --gres=gpu:h100_pcie_80gb:1
+#SBATCH --gres=gpu:l4_gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G

@@ -8,7 +8,7 @@ _base_ = [
     '../../_algorithms_/VICReg.py',
 ]
 
-batch_size  = 512   # H100 PCIe (80GB) — 4 views still fits comfortably
+batch_size  = 128   # L4 (22GB) — 4 views × 37 markers
 num_workers = 16
 mask_patch  = False
 
