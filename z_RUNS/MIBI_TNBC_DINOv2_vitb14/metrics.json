@@ -1,0 +1,50 @@
+{
+  "val": {
+    "lp_balanced_accuracy": 0.2562870951460351,
+    "mean_ap": 0.1646852982247036,
+    "per_class_ap": {
+      "B": 0.3610523552595928,
+      "CD3 T": 0.05373356279030709,
+      "CD4 T": 0.2746971899203925,
+      "CD8 T": 0.20729806683294028,
+      "DC": 0.02276410764485133,
+      "DC/Mono": 0.059080782183184626,
+      "Endothelial": 0.03238455128745679,
+      "Keratin-positive tumor": 0.8158480075273156,
+      "Macrophages": 0.23611534516965893,
+      "Mesenchymal-like": 0.2182783114741666,
+      "Mono/Neu": 0.042713013371470585,
+      "NK": 0.010148357320001355,
+      "Neutrophils": 0.05060996713881366,
+      "Other immune": 0.12997297582472997,
+      "Tregs": 0.0712857061641518,
+      "Tumor": 0.12610035330806688,
+      "Unidentified": 0.08756741660286034
+    },
+    "knn_balanced_accuracy": 0.08746325921598068,
+    "nmi": 0.03084390696679899,
+    "ari": 0.009376750027572376,
+    "silhouette": -0.08868386596441269,
+    "neighbourhood_purity": 0.35197800158577525
+  },
+  "n_classes": 17,
+  "classes": [
+    "B",
+    "CD3 T",
+    "CD4 T",
+    "CD8 T",
+    "DC",
+    "DC/Mono",
+    "Endothelial",
+    "Keratin-positive tumor",
+    "Macrophages",
+    "Mesenchymal-like",
+    "Mono/Neu",
+    "NK",
+    "Neutrophils",
+    "Other immune",
+    "Tregs",
+    "Tumor",
+    "Unidentified"
+  ]
+}

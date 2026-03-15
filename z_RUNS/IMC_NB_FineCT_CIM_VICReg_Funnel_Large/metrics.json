@@ -1,0 +1,155 @@
+{
+  "classes": [
+    "B_Cell",
+    "CD4_T",
+    "CD8_T",
+    "Myeloid",
+    "NK_DC",
+    "Neutrophil",
+    "Progenitor",
+    "Proliferating",
+    "Stromal",
+    "T_Cell",
+    "Tumor"
+  ],
+  "n_classes": 11,
+  "feature_dim": 512,
+  "linear_probe": {
+    "train": {
+      "top1_accuracy": 0.787273762204299,
+      "top2_accuracy": 0.9513033998379192,
+      "top1_balanced_accuracy": 0.8798866759256871,
+      "top2_balanced_accuracy": 0.9698107907664617,
+      "precision": 0.83534148787045,
+      "f1": 0.7993791490568737,
+      "n_samples": 207304
+    },
+    "val": {
+      "top1_accuracy": 0.7801566932324733,
+      "top2_accuracy": 0.9461029312440903,
+      "top1_balanced_accuracy": 0.8025389723552071,
+      "top2_balanced_accuracy": 0.9113287032451509,
+      "precision": 0.8294771051174684,
+      "f1": 0.7935569753948125,
+      "n_samples": 29612,
+      "mean_average_precision": 0.7650538882759045,
+      "per_class_ap": {
+        "B_Cell": 0.9247,
+        "CD4_T": 0.6104,
+        "CD8_T": 0.7957,
+        "Myeloid": 0.8025,
+        "NK_DC": 0.5664,
+        "Neutrophil": 0.7507,
+        "Progenitor": 0.4374,
+        "Proliferating": 0.8266,
+        "Stromal": 0.9026,
+        "T_Cell": 0.838,
+        "Tumor": 0.9606
+      }
+    }
+  },
+  "knn": {
+    "k": 15,
+    "val": {
+      "top1_accuracy": 0.8102796163717412,
+      "top1_balanced_accuracy": 0.5906485366334963,
+      "f1": 0.8053027795266369
+    }
+  },
+  "clustering": {
+    "method": "MiniBatchKMeans(k=11, n_init=10)",
+    "val": {
+      "nmi": 0.27703636546208243,
+      "ari": 0.13512045402383394
+    },
+    "all": {
+      "nmi": 0.27434812057682945,
+      "ari": 0.13291778644415111
+    }
+  },
+  "neighbourhood_purity": {
+    "k": 15,
+    "mean_purity": 0.7083164482867306,
+    "mean_lift": 67.52615283162118,
+    "per_class": {
+      "B_Cell": {
+        "purity": 0.7441629408842524,
+        "expected_chance": 0.022659732540861812,
+        "purity_lift": 32.840764538695204,
+        "n_cells": 671
+      },
+      "CD4_T": {
+        "purity": 0.17704918032786884,
+        "expected_chance": 0.006179927056598676,
+        "purity_lift": 28.64907282988444,
+        "n_cells": 183
+      },
+      "CD8_T": {
+        "purity": 0.40349854227405246,
+        "expected_chance": 0.011583141969471836,
+        "purity_lift": 34.83498202279662,
+        "n_cells": 343
+      },
+      "Myeloid": {
+        "purity": 0.43760241483398016,
+        "expected_chance": 0.026104282047818454,
+        "purity_lift": 16.76362575428696,
+        "n_cells": 773
+      },
+      "NK_DC": {
+        "purity": 0.20606060606060606,
+        "expected_chance": 0.0003714710252600297,
+        "purity_lift": 554.7151515151515,
+        "n_cells": 11
+      },
+      "Neutrophil": {
+        "purity": 0.592156862745098,
+        "expected_chance": 0.013204106443333783,
+        "purity_lift": 44.84641692994334,
+        "n_cells": 391
+      },
+      "Progenitor": {
+        "purity": 0.08852459016393442,
+        "expected_chance": 0.006179927056598676,
+        "purity_lift": 14.32453641494222,
+        "n_cells": 183
+      },
+      "Proliferating": {
+        "purity": 0.4841499162479062,
+        "expected_chance": 0.10752397676617588,
+        "purity_lift": 4.502715866813127,
+        "n_cells": 3184
+      },
+      "Stromal": {
+        "purity": 0.7276116168183788,
+        "expected_chance": 0.1298460083749831,
+        "purity_lift": 5.603650246352623,
+        "n_cells": 3845
+      },
+      "T_Cell": {
+        "purity": 0.6973266331658291,
+        "expected_chance": 0.1680062136971498,
+        "purity_lift": 4.1506002535289515,
+        "n_cells": 4975
+      },
+      "Tumor": {
+        "purity": 0.7910626896078301,
+        "expected_chance": 0.508341213021748,
+        "purity_lift": 1.5561647754379235,
+        "n_cells": 15053
+      }
+    }
+  },
+  "sample_integration": {
+    "score": 0.1499186009168625,
+    "n_samples": 10000,
+    "metric": "cosine",
+    "note": "+1=fully mixed, -1=fully separated"
+  },
+  "umap": {
+    "saved": true,
+    "n_neighbors": 15,
+    "min_dist": 0.1,
+    "metric": "cosine"
+  }
+}

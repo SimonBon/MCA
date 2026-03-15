@@ -1,0 +1,40 @@
+{
+  "val": {
+    "lp_balanced_accuracy": 0.2342149345644069,
+    "mean_ap": 0.17117615532843256,
+    "per_class_ap": {
+      "B_Cell": 0.10578153160228118,
+      "CD4_T": 0.011377086752239684,
+      "CD8_T": 0.024377318725600047,
+      "Myeloid": 0.03658922143261531,
+      "NK_DC": 0.0007344573002159535,
+      "Neutrophil": 0.046318519724835965,
+      "Other": 0.23762683238843502,
+      "Progenitor": 0.016699626849665323,
+      "Proliferating": 0.24735078980273617,
+      "Stromal": 0.22473263257823442,
+      "T_Cell": 0.41920725210397,
+      "Tumor": 0.6833185946803616
+    },
+    "knn_balanced_accuracy": 0.12800859691983998,
+    "nmi": 0.038444318316371066,
+    "ari": 0.010480701273024941,
+    "silhouette": -0.327317476272583,
+    "neighbourhood_purity": 0.3903001232470604
+  },
+  "n_classes": 12,
+  "classes": [
+    "B_Cell",
+    "CD4_T",
+    "CD8_T",
+    "Myeloid",
+    "NK_DC",
+    "Neutrophil",
+    "Other",
+    "Progenitor",
+    "Proliferating",
+    "Stromal",
+    "T_Cell",
+    "Tumor"
+  ]
+}

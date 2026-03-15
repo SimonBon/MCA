@@ -1,0 +1,30 @@
+{
+  "val": {
+    "lp_balanced_accuracy": 0.3524138674403474,
+    "mean_ap": 0.275234993234128,
+    "per_class_ap": {
+      "B_Cell": 0.10155627486390748,
+      "Myeloid": 0.05328253048167463,
+      "Other": 0.2545443720043783,
+      "Progenitor": 0.018836348106692765,
+      "Stromal": 0.23213131535205409,
+      "T_Cell": 0.46409386624265503,
+      "Tumor": 0.8022002455875336
+    },
+    "knn_balanced_accuracy": 0.2159011365002393,
+    "nmi": 0.03371344331958552,
+    "ari": 0.01923970806013337,
+    "silhouette": -0.056181903928518295,
+    "neighbourhood_purity": 0.49875868807319085
+  },
+  "n_classes": 7,
+  "classes": [
+    "B_Cell",
+    "Myeloid",
+    "Other",
+    "Progenitor",
+    "Stromal",
+    "T_Cell",
+    "Tumor"
+  ]
+}
