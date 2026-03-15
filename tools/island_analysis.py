@@ -146,28 +146,39 @@ sample_colours_arr = np.array([sample_colour[s] for s in sample_ids])
 
 # ── Row 0: UMAP coloured by sample ────────────────────────────────────────────
 ax0 = fig.add_subplot(gs[0, :])
-ax0.scatter(xy[:, 0], xy[:, 1], c=sample_colours_arr, **POINT_KW)
-# highlight island cells with a ring
+island_highlight = np.zeros(len(xy), dtype=bool)
+for _, island_mask, _, _ in islands:
+    island_highlight |= island_mask
+# background cells first, then island cells on top in bright colour
+ax0.scatter(xy[~island_highlight, 0], xy[~island_highlight, 1],
+            c=sample_colours_arr[~island_highlight], **POINT_KW, alpha=0.5)
+island_colours = ['#ff4500', '#00bfff']
 for idx, (cid, island_mask, top_sample, dominance) in enumerate(islands):
     ax0.scatter(xy[island_mask, 0], xy[island_mask, 1],
-                s=12, facecolors='none', edgecolors='black', linewidths=0.6,
-                label=f'Island {idx+1}: sample {top_sample}', zorder=5)
-ax0.set_title('UMAP coloured by patient ID  (island cells circled)', fontsize=10)
+                s=10, color=island_colours[idx % len(island_colours)],
+                label=f'Island {idx+1}: sample {top_sample}', zorder=5,
+                linewidths=0)
+ax0.set_title('UMAP coloured by patient ID  (islands highlighted)', fontsize=10)
 ax0.legend(fontsize=8, markerscale=2)
 ax0.set_xlabel('UMAP 1'); ax0.set_ylabel('UMAP 2')
 ax0.set_aspect('equal', adjustable='datalim')
 
 # ── Row 1: UMAP coloured by EGFR expression ───────────────────────────────────
 ax1 = fig.add_subplot(gs[1, :])
-vmax = np.nanpercentile(egfr_per_cell, 99)
-sc = ax1.scatter(xy[:, 0], xy[:, 1], c=egfr_per_cell,
+# clip at 95th percentile so island cells (which are high) stand out visually
+vmax = np.nanpercentile(egfr_per_cell, 95)
+sc = ax1.scatter(xy[~island_highlight, 0], xy[~island_highlight, 1],
+                 c=egfr_per_cell[~island_highlight],
                  cmap='viridis', vmin=0, vmax=vmax, **POINT_KW)
+# draw island cells last so they sit on top
 for idx, (cid, island_mask, top_sample, dominance) in enumerate(islands):
     ax1.scatter(xy[island_mask, 0], xy[island_mask, 1],
-                s=12, facecolors='none', edgecolors='white', linewidths=0.6,
+                c=egfr_per_cell[island_mask],
+                cmap='viridis', vmin=0, vmax=vmax,
+                s=10, linewidths=0.5, edgecolors=island_colours[idx % len(island_colours)],
                 label=f'Island {idx+1}: sample {top_sample}', zorder=5)
 plt.colorbar(sc, ax=ax1, fraction=0.02, pad=0.01, label='mean EGFR expression')
-ax1.set_title('UMAP coloured by EGFR expression  (island cells circled)', fontsize=10)
+ax1.set_title('UMAP coloured by EGFR expression  (islands outlined)', fontsize=10)
 ax1.legend(fontsize=8, markerscale=2)
 ax1.set_xlabel('UMAP 1'); ax1.set_ylabel('UMAP 2')
 ax1.set_aspect('equal', adjustable='datalim')
