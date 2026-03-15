@@ -3,6 +3,7 @@
 #SBATCH --output=/home/sgutwein/logs/island_TNBC_%j.log
 #SBATCH --error=/home/sgutwein/logs/island_TNBC_%j.log
 #SBATCH --partition=shortq
+#SBATCH --qos=shortq
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
