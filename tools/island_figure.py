@@ -185,6 +185,7 @@ x1,x99 = np.percentile(xy[:,0],[1,99]); pad_x = (x99-x1)*0.08
 y1,y99 = np.percentile(xy[:,1],[1,99]); pad_y = (y99-y1)*0.08
 ax_umap.set_xlim(x1-pad_x, x99+pad_x)
 ax_umap.set_ylim(y1-pad_y, y99+pad_y)
+ax_umap.set_aspect('equal', adjustable='box')
 ax_umap.tick_params(labelsize=8)
 
 # ── Patch panels ──────────────────────────────────────────────────────────────
