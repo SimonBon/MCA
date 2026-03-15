@@ -88,7 +88,7 @@ s2_immune_mask = np.array([
 # ── Region definitions ────────────────────────────────────────────────────────
 # colour, umap_mask (for UMAP highlighting), h5_selector (for patch fetching)
 REGIONS = []
-COLOURS = ['#e6194b', '#f58231', '#4363d8', '#808080']
+COLOURS = ['#e6194b', '#ff8c00', '#00aaff', '#2ca02c']
 
 for isl in islands:
     s, t = isl['sample'], isl['top_type']
@@ -117,7 +117,7 @@ REGIONS.append(dict(
 
 n_regions = len(REGIONS)
 n_markers = len(display_names)
-n_p       = args.n_patches
+n_p       = min(args.n_patches, 4)   # 4 per group keeps figure readable
 
 # ── Patch helper ──────────────────────────────────────────────────────────────
 def get_patch(f, sid, d1, d2):
@@ -151,23 +151,30 @@ with h5py.File(H5, 'r') as hf:
 
 # ── Figure layout ─────────────────────────────────────────────────────────────
 # Top: UMAP (full width)
-# Bottom: n_regions columns × n_markers rows of patch panels
-fig = plt.figure(figsize=(n_p * n_regions * 1.1 + 0.5, 14))
-gs_outer = GridSpec(2, 1, figure=fig, height_ratios=[1.6, 1], hspace=0.12)
+# Bottom: n_regions columns × (header + n_markers) rows of patch panels
+fig = plt.figure(figsize=(n_p * n_regions * 1.55 + 1.5, 14))
+gs_outer = GridSpec(2, 1, figure=fig, height_ratios=[1.5, 1], hspace=0.18)
 
 # ── UMAP panel ────────────────────────────────────────────────────────────────
 ax_umap = fig.add_subplot(gs_outer[0])
 
-# all cells light gray background
-ax_umap.scatter(xy[:, 0], xy[:, 1], c='#cccccc', s=1.2,
-                linewidths=0, rasterized=True, alpha=0.4, zorder=1)
+# all cells very light gray background
+highlighted = np.zeros(len(xy), dtype=bool)
+for reg in REGIONS:
+    highlighted |= reg['umap_mask']
 
-# highlight each region; reference last so it doesn't dominate
+ax_umap.scatter(xy[~highlighted, 0], xy[~highlighted, 1],
+                c='#dddddd', s=1.0, linewidths=0, rasterized=True, alpha=0.5, zorder=1)
+
+# highlighted regions: draw reference first (background), islands on top
 for reg in REGIONS[::-1]:
     m = reg['umap_mask']
+    is_ref = 'Reference' in reg['label']
     ax_umap.scatter(xy[m, 0], xy[m, 1], c=reg['colour'],
-                    s=6 if 'Reference' not in reg['label'] else 3,
-                    linewidths=0, rasterized=True, alpha=0.9, zorder=2,
+                    s=4 if is_ref else 18,
+                    linewidths=0, rasterized=True,
+                    alpha=0.5 if is_ref else 0.95,
+                    zorder=2 if is_ref else 3,
                     label=reg['label'].replace('\n', ' '))
 
 ax_umap.legend(fontsize=8, markerscale=2.5, loc='upper right',
@@ -183,45 +190,63 @@ ax_umap.tick_params(labelsize=8)
 # (done via fig.text annotations after axes are placed)
 
 # ── Patch grid ────────────────────────────────────────────────────────────────
+# +1 row per region for the coloured header bar
 gs_patches = gs_outer[1].subgridspec(
-    n_markers, n_regions * n_p,
-    hspace=0.04, wspace=0.03,
+    n_markers + 1, n_regions * n_p,
+    hspace=0.06, wspace=0.04,
+    height_ratios=[0.18] + [1] * n_markers,
 )
 
 for r_idx, (reg, patches) in enumerate(zip(REGIONS, region_patches)):
     col_start = r_idx * n_p
     colour    = reg['colour']
 
+    # ── Coloured header bar spanning all patch columns for this region ──────
+    for p_idx in range(n_p):
+        ax_hdr = fig.add_subplot(gs_patches[0, col_start + p_idx])
+        ax_hdr.set_facecolor(colour)
+        ax_hdr.set_xticks([]); ax_hdr.set_yticks([])
+        for sp in ax_hdr.spines.values():
+            sp.set_visible(False)
+    # label in the first header cell
+    ax_hdr0 = fig.add_subplot(gs_patches[0, col_start])
+    ax_hdr0.set_facecolor(colour)
+    ax_hdr0.set_xticks([]); ax_hdr0.set_yticks([])
+    ax_hdr0.text(0.5 * n_p, 0.5, reg['label'].replace('\n', '  '),
+                 transform=ax_hdr0.transData if False else
+                 fig.transFigure,   # overridden below
+                 fontsize=0)        # placeholder — use annotate instead
+    # use a figure-level text centred over the group
+    bbox = gs_patches[0, col_start].get_position(fig)
+    bbox_end = gs_patches[0, col_start + n_p - 1].get_position(fig)
+    cx = (bbox.x0 + bbox_end.x1) / 2
+    cy = (bbox.y0 + bbox.y1) / 2
+    fig.text(cx, cy, reg['label'].replace('\n', '  '),
+             ha='center', va='center', fontsize=7.5,
+             fontweight='bold', color='white')
+
+    # ── Patch images ──────────────────────────────────────────────────────
     for p_idx, (patch, sid, ann) in enumerate(patches):
         for m_idx, mname in enumerate(display_names):
-            ax = fig.add_subplot(gs_patches[m_idx, col_start + p_idx])
+            ax = fig.add_subplot(gs_patches[m_idx + 1, col_start + p_idx])
             ch = norm(patch[:, :, marker_names.index(mname)])
             ax.imshow(ch, cmap='inferno', vmin=0, vmax=1, interpolation='nearest')
             ax.set_xticks([]); ax.set_yticks([])
 
-            # coloured border matching UMAP region colour
+            # thin coloured border on every patch
             for spine in ax.spines.values():
                 spine.set_edgecolor(colour)
-                spine.set_linewidth(1.8)
+                spine.set_linewidth(1.2)
 
-            # marker label on leftmost column of each region
+            # marker name on leftmost patch of each region
             if p_idx == 0:
                 ax.set_ylabel(mname, fontsize=7, rotation=0,
                               ha='right', va='center', labelpad=38)
 
-            # cell annotation on top row first patch
-            if m_idx == 0 and p_idx == 0:
-                ax.set_title(reg['label'], fontsize=7, fontweight='bold',
-                             color=colour, loc='left', pad=3)
-
-            # sample/type on top row
+            # cell label on top marker row
             if m_idx == 0:
-                ax.set_title(
-                    (ax.get_title() or '') + f'\ns{sid}/{ann[:6]}',
-                    fontsize=5, color='#444444', loc='left', pad=3
-                ) if p_idx == 0 else ax.set_title(
-                    f's{sid}/{ann[:6]}', fontsize=5, color='#444444', pad=3
-                )
+                ax.set_title(f's{sid}/{ann[:7]}', fontsize=5.5,
+                             color='#333333', pad=2)
 
 fig.suptitle(
     f'UMAP regions and representative cell patches — {args.model}',
