@@ -14,6 +14,7 @@ source /nobackup/lab_taschner-mandl/simongutwein/miniconda3/etc/profile.d/conda.
 conda activate mca310
 
 export PYTHONPATH=/home/sgutwein/src:$PYTHONPATH
+export PYTHONUNBUFFERED=1
 
 CFG=/home/sgutwein/src/MCA/configs/_experiments_/MIBI_TNBC/CIM_VICReg_Funnel_Large_6view.py
 

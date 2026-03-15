@@ -14,6 +14,7 @@ source /nobackup/lab_taschner-mandl/simongutwein/miniconda3/etc/profile.d/conda.
 conda activate mca310
 
 export PYTHONPATH=/home/sgutwein/src:$PYTHONPATH
+export PYTHONUNBUFFERED=1
 
 TRAIN=/home/sgutwein/src/mmselfsup/tools/train.py
 CFG=/home/sgutwein/src/MCA/configs/_experiments_/CODEX_cHL/CIM_VICReg_SampleAlign_KRONOS18.py
