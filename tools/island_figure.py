@@ -145,18 +145,28 @@ with h5py.File(H5, 'r') as hf:
         print(f'  {reg["short"]}: {len(cell_idxs)} cells, showing {len(chosen)}')
 
 # ── Figure ────────────────────────────────────────────────────────────────────
-# Layout: 1 UMAP row, then per-region: 1 header row + n_markers patch rows
-# All columns: n_regions × n_p patch columns + label column on left per region
-fig_w = 4 + n_regions * (n_p * 1.5 + 0.5)
-fig_h = 8 + n_markers * 1.2
+patch_w   = n_regions * (n_p * 1.5 + 0.5) + 2   # width driven by patch columns
+umap_size = 5.5                                   # UMAP is a fixed square (inches)
+patch_h   = 1.0 + n_markers * 1.3                # height of patch strip
+fig_w     = max(patch_w, umap_size + 2)
+fig_h     = umap_size + 0.8 + patch_h            # UMAP + gap + patches
+
 fig = plt.figure(figsize=(fig_w, fig_h))
 
-# Outer: UMAP on top, patches below
-gs_outer = GridSpec(2, 1, figure=fig, height_ratios=[2.2, n_markers * 0.8],
-                    hspace=0.25)
+# Outer: UMAP row on top, patch strip below
+gs_outer = GridSpec(2, 1, figure=fig,
+                    height_ratios=[umap_size + 0.5, patch_h],
+                    hspace=0.18)
 
-# ── UMAP ──────────────────────────────────────────────────────────────────────
-ax_umap = fig.add_subplot(gs_outer[0])
+# Place UMAP as a centred square axes inside the top row
+# — using add_subplot would stretch it; instead we carve out a square with add_axes
+umap_row = gs_outer[0].get_position(fig)   # [x0,y0,width,height] in figure coords
+# target: square of umap_size inches centred horizontally
+sq_w = umap_size / fig_w                   # fraction of figure width
+sq_h = umap_size / fig_h                   # fraction of figure height
+cx   = umap_row.x0 + umap_row.width / 2
+cy   = umap_row.y0 + umap_row.height / 2
+ax_umap = fig.add_axes([cx - sq_w/2, cy - sq_h/2, sq_w, sq_h])
 
 highlighted = np.zeros(len(xy), dtype=bool)
 for reg in REGIONS:
@@ -185,7 +195,6 @@ x1,x99 = np.percentile(xy[:,0],[1,99]); pad_x = (x99-x1)*0.08
 y1,y99 = np.percentile(xy[:,1],[1,99]); pad_y = (y99-y1)*0.08
 ax_umap.set_xlim(x1-pad_x, x99+pad_x)
 ax_umap.set_ylim(y1-pad_y, y99+pad_y)
-ax_umap.set_aspect('equal', adjustable='box')
 ax_umap.tick_params(labelsize=8)
 
 # ── Patch panels ──────────────────────────────────────────────────────────────
