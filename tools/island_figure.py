@@ -180,7 +180,11 @@ ax_umap.set_xlabel('UMAP 1', fontsize=9)
 ax_umap.set_ylabel('UMAP 2', fontsize=9)
 ax_umap.set_title('UMAP — coloured regions correspond to patch panels below',
                   fontsize=10, pad=8)
-ax_umap.set_aspect('equal', adjustable='datalim')
+# clip to 1st–99th percentile range to exclude outlier points
+x1,x99 = np.percentile(xy[:,0],[1,99]); pad_x = (x99-x1)*0.08
+y1,y99 = np.percentile(xy[:,1],[1,99]); pad_y = (y99-y1)*0.08
+ax_umap.set_xlim(x1-pad_x, x99+pad_x)
+ax_umap.set_ylim(y1-pad_y, y99+pad_y)
 ax_umap.tick_params(labelsize=8)
 
 # ── Patch panels ──────────────────────────────────────────────────────────────
@@ -198,7 +202,7 @@ for r_idx, (reg, patches) in enumerate(zip(REGIONS, region_patches)):
         n_markers + 1, n_p,
         subplot_spec=gs_bottom[0, r_idx],
         hspace=0.05, wspace=0.04,
-        height_ratios=[0.22] + [1] * n_markers,
+        height_ratios=[0.32] + [1] * n_markers,
     )
 
     # ── Coloured header spanning full group width ──────────────────────────
@@ -215,11 +219,11 @@ for r_idx, (reg, patches) in enumerate(zip(REGIONS, region_patches)):
     # Centre the group label across the header by annotating the middle cell
     mid = n_p // 2
     hdr_axes[mid].text(
-        0.5, 0.5, reg['label'].replace('\n', '  '),
+        0.5, 0.5, reg['label'].replace('\n', '\n'),
         transform=hdr_axes[mid].transAxes,
         ha='center', va='center',
-        fontsize=8, fontweight='bold', color='white',
-        clip_on=False,
+        fontsize=7, fontweight='bold', color='white',
+        clip_on=False, linespacing=1.3,
     )
 
     # ── Patch cells ───────────────────────────────────────────────────────
