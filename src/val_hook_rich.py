@@ -401,6 +401,44 @@ class EvaluateModelRich(Hook):
         print(f"  Saved label_efficiency.json + label_efficiency.pdf to {work_dir}")
 
     # ──────────────────────────────────────────────────────────────────────
+    # LISI
+    # ──────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _compute_lisi(features, labels, n_neighbors=90, metric='cosine'):
+        """Local Inverse Simpson's Index (Harmony, Korsunsky et al. 2019).
+
+        For each cell, look at its n_neighbors nearest neighbours and compute
+        the inverse of Simpson's diversity index over the label distribution.
+
+        Returns a per-cell array of LISI values in [1, N_unique_labels].
+        Use with cell-type labels for cLISI (low = compact),
+        or with sample IDs for iLISI (high = well mixed).
+        """
+        n = len(features)
+        k = min(n_neighbors, n - 1)
+        nbrs = NearestNeighbors(n_neighbors=k + 1, metric=metric,
+                                n_jobs=-1, algorithm='auto')
+        nbrs.fit(features)
+        _, indices = nbrs.kneighbors(features)
+        indices = indices[:, 1:]          # exclude self
+
+        unique_labels = np.unique(labels)
+        label_to_int  = {l: i for i, l in enumerate(unique_labels)}
+        label_ints    = np.array([label_to_int[l] for l in labels])
+        n_labels      = len(unique_labels)
+
+        lisi = np.empty(n, dtype=np.float32)
+        for i in range(n):
+            nbr_lbls = label_ints[indices[i]]
+            simpson  = 0.0
+            for l in range(n_labels):
+                p = np.mean(nbr_lbls == l)
+                simpson += p * p
+            lisi[i] = 1.0 / simpson if simpson > 0 else 1.0
+        return lisi
+
+    # ──────────────────────────────────────────────────────────────────────
     # Main evaluation
     # ──────────────────────────────────────────────────────────────────────
 
@@ -569,31 +607,52 @@ class EvaluateModelRich(Hook):
         print(f"  Mean neighbourhood purity: {mean_purity:.4f}  |  Mean lift: {mean_lift:.2f}x")
         _save_metrics()
 
-        # ── 5. Sample integration score ───────────────────────────────────
-        # Silhouette by sample ID, negated: +1 = fully mixed, -1 = fully separated
-        print(f"\n=== 5. Sample Integration (cosine, "
-              f"max {self.silhouette_max_samples} samples) ===")
-        n_sil   = min(self.silhouette_max_samples, len(val_feats))
-        sil_idx = np.random.default_rng().choice(len(val_feats), n_sil, replace=False)
-
-        unique_sample_ids = np.unique(val_ids[sil_idx])
-        if len(unique_sample_ids) >= 2:
-            sil_sample_raw = float(silhouette_score(
-                val_feats[sil_idx], val_ids[sil_idx], metric='cosine'
-            ))
-            sample_integration = -sil_sample_raw
-        else:
-            sil_sample_raw     = float('nan')
-            sample_integration = float('nan')
-
-        metrics['sample_integration'] = {
-            'score':              sample_integration,
-            'n_samples':          n_sil,
-            'metric':             'cosine',
-            'note':               '+1=fully mixed, -1=fully separated',
+        # ── 5. cLISI — cell-type compactness ──────────────────────────────
+        # cLISI ∈ [1, N_types]: 1 = every neighbour same type (compact),
+        # N_types = perfectly mixed (no structure).
+        # Normalised cLISI = (cLISI - 1) / (N_types - 1) ∈ [0, 1], lower = better.
+        print(f"\n=== 5. cLISI — cell-type compactness (k={self.knn_k}) ===")
+        clisi_vals = self._compute_lisi(val_feats, val_labels_str,
+                                        n_neighbors=self.knn_k, metric='cosine')
+        clisi_mean = float(np.mean(clisi_vals))
+        clisi_norm = float((clisi_mean - 1) / max(n_classes - 1, 1))
+        per_class_clisi = {
+            cls: float(np.mean(clisi_vals[val_labels == c]))
+            for c, cls in enumerate(classes)
+            if (val_labels == c).sum() > 0
         }
-        print(f"  Sample integration:     {sample_integration:.4f}")
+        metrics['clisi'] = {
+            'k':           self.knn_k,
+            'mean':        clisi_mean,
+            'normalised':  clisi_norm,
+            'note':        'normalised: 0=compact, 1=random; lower is better',
+            'per_class':   {k: round(v, 4) for k, v in per_class_clisi.items()},
+        }
+        print(f"  cLISI (mean): {clisi_mean:.4f}  |  normalised: {clisi_norm:.4f}")
         _save_metrics()
+
+        # ── 6. iLISI — sample integration ─────────────────────────────────
+        # iLISI ∈ [1, N_samples]: 1 = all neighbours same sample (not mixed),
+        # N_samples = perfectly mixed.
+        # Normalised iLISI = (iLISI - 1) / (N_samples - 1) ∈ [0, 1], higher = better.
+        print(f"\n=== 6. iLISI — sample integration (k={self.knn_k}) ===")
+        n_unique_samples = len(np.unique(val_ids))
+        ilisi_vals = self._compute_lisi(val_feats, val_ids,
+                                        n_neighbors=self.knn_k, metric='cosine')
+        ilisi_mean = float(np.mean(ilisi_vals))
+        ilisi_norm = float((ilisi_mean - 1) / max(n_unique_samples - 1, 1))
+        metrics['ilisi'] = {
+            'k':              self.knn_k,
+            'mean':           ilisi_mean,
+            'normalised':     ilisi_norm,
+            'n_unique_samples': n_unique_samples,
+            'note':           'normalised: 0=separated, 1=fully mixed; higher is better',
+        }
+        print(f"  iLISI (mean): {ilisi_mean:.4f}  |  normalised: {ilisi_norm:.4f}")
+        _save_metrics()
+
+        # keep silhouette-based integration for backwards compat
+        sample_integration = float('nan')
 
         # ── 6. Confusion Matrix (linear probe) ────────────────────────────
         val_pred_str_lr = le.inverse_transform(val_pred_lr)
@@ -707,14 +766,15 @@ class EvaluateModelRich(Hook):
         knn = metrics['knn']['val']
         cl  = metrics['clustering']['val']
         print(f"""
-╔══════════════════════════════════════════════════╗
-║              Evaluation Summary (Val)            ║
-╠══════════════════════════════════════════════════╣
-║  Linear Probe  bal-acc  {lp['top1_balanced_accuracy']:.4f}   F1 {lp['f1']:.4f}  ║
-║  k-NN (k={self.knn_k:2d})    bal-acc  {knn['top1_balanced_accuracy']:.4f}   F1 {knn['f1']:.4f}  ║
-║  Clustering    NMI      {cl['nmi']:.4f}   ARI {cl['ari']:.4f} ║
-║  Nbhd purity  raw {mean_purity:.4f}  lift {mean_lift:.2f}x           ║
-║  Sample integration (+1=mixed) {sample_integration:.4f}              ║
-╚══════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════╗
+║               Evaluation Summary (Val)               ║
+╠═══════════════════════════════════════════════════════╣
+║  Linear Probe  bal-acc  {lp['top1_balanced_accuracy']:.4f}   F1 {lp['f1']:.4f}     ║
+║  k-NN (k={self.knn_k:2d})    bal-acc  {knn['top1_balanced_accuracy']:.4f}   F1 {knn['f1']:.4f}     ║
+║  Clustering    NMI      {cl['nmi']:.4f}   ARI {cl['ari']:.4f}    ║
+║  Nbhd purity   raw {mean_purity:.4f}   lift {mean_lift:.2f}x           ║
+║  cLISI (norm)  {clisi_norm:.4f}  (0=compact, 1=random)       ║
+║  iLISI (norm)  {ilisi_norm:.4f}  (0=separated, 1=mixed)      ║
+╚═══════════════════════════════════════════════════════╝
 """)
         print(f"Saved metrics to {work_dir}/metrics.json")
