@@ -101,6 +101,48 @@ def plot_heatmap(attr_matrix, marker_names, cluster_labels, out_path):
     print(f'  Saved {out_path}')
 
 
+def plot_marker_panels(attr_matrix, marker_names, coords, out_path, percentile=99):
+    """Grid of UMAPs: one panel per marker, coloured by attribution intensity.
+
+    Colour scale is per-marker (0 → 99th percentile) so rare high-attribution
+    cells stand out. Row-normalised attribution so total influence sums to 1
+    per cell (removes cell-size bias).
+    """
+    # Row-normalise so each cell's attributions sum to 1
+    attr_norm = attr_matrix / (attr_matrix.sum(axis=1, keepdims=True) + 1e-8)
+
+    n = len(marker_names)
+    ncols = 8
+    nrows = int(np.ceil(n / ncols))
+
+    fig, axes = plt.subplots(nrows, ncols,
+                             figsize=(ncols * 2.2, nrows * 2.0))
+    axes = axes.flatten()
+
+    for i, name in enumerate(marker_names):
+        ax  = axes[i]
+        val = attr_norm[:, i]
+        vmax = np.percentile(val, percentile)
+
+        sc_plot = ax.scatter(coords[:, 0], coords[:, 1],
+                             c=val, s=1, alpha=0.6, linewidths=0,
+                             cmap='YlOrRd', vmin=0, vmax=vmax)
+        ax.set_title(name, fontsize=7, pad=2)
+        ax.set_xticks([]); ax.set_yticks([])
+        plt.colorbar(sc_plot, ax=ax, fraction=0.046, pad=0.04)
+
+    # Hide unused panels
+    for j in range(i + 1, len(axes)):
+        axes[j].set_visible(False)
+
+    fig.suptitle('Marker attribution influence on UMAP\n(row-normalised IG, per-marker colour scale)',
+                 fontsize=10, y=1.01)
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    print(f'  Saved {out_path}')
+
+
 def print_cluster_summary(attr_matrix, marker_names, cluster_labels, gt_labels):
     clusters = sorted(set(cluster_labels), key=lambda x: int(x))
     print('\n── Cluster summary ──────────────────────────────────────────────')
@@ -189,6 +231,9 @@ def main():
 
     # ── Heatmap ───────────────────────────────────────────────────────────
     plot_heatmap(attr, marker_names, cluster_labels, out / 'heatmap.png')
+
+    # ── Marker influence panels ────────────────────────────────────────────
+    plot_marker_panels(attr, marker_names, coords, out / 'umap_marker_influence.png')
 
     # ── Summary ───────────────────────────────────────────────────────────
     print_cluster_summary(attr, marker_names, cluster_labels, labels)
