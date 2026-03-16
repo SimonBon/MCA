@@ -1,0 +1,97 @@
+from copy import deepcopy
+
+_base_ = [
+    '../../../_base_/default.py',
+    '../../../_base_/val_cfg.py',
+    '../../../_datasets_/CODEX_cHL.py',
+    '../../../_backbones_/CIM_Funnel_Large.py',
+    '../../../_algorithms_/VICReg.py',
+]
+
+mask_patch = True
+
+_base_.h5_filepath    = '/nobackup/lab_taschner-mandl/simongutwein/h5_files/CODEX_cHL/CODEX_cHL.h5'
+_base_.used_markers   = '/nobackup/lab_taschner-mandl/simongutwein/h5_files/CODEX_cHL/used_markers.txt'
+_base_.train_indicies = '/nobackup/lab_taschner-mandl/simongutwein/h5_files/CODEX_cHL/train.txt'
+_base_.test_indicies  = '/nobackup/lab_taschner-mandl/simongutwein/h5_files/CODEX_cHL/test.txt'
+_base_.dataset_kwargs['h5_filepath']  = _base_.h5_filepath
+_base_.dataset_kwargs['used_markers'] = _base_.used_markers
+
+# ── Optimizer / schedule ──────────────────────────────────────────────────────
+n_linear      = 400
+n_cosine      = 7600
+optimizer     = dict(type='LARS', lr=0.3, momentum=0.9, weight_decay=1e-5)
+optim_wrapper = dict(type='OptimWrapper', optimizer=optimizer)
+train_cfg     = dict(type='IterBasedTrainLoop', max_iters=n_linear + n_cosine)
+param_scheduler = [
+    dict(type='LinearLR',          start_factor=1e-4, by_epoch=False, begin=0,        end=n_linear),
+    dict(type='CosineAnnealingLR', T_max=n_cosine,    by_epoch=False, begin=n_linear, end=n_linear + n_cosine, eta_min=0.03),
+]
+
+# ── Augmentations ─────────────────────────────────────────────────────────────
+train_aug_strong = [
+    dict(type='C_RandomFlip',              prob=0.5, horizontal=True, vertical=True),
+    dict(type='C_RandomAffine',            angle=(0, 360), scale=(0.8, 1.2), shift=(0, 0), order=1),
+    dict(type='C_RandomNoise',             mean=(0, 0), std=(0, 0.02), clip=True),
+    dict(type='C_RandomChannelDrop',       drop_prob=0.1),
+    dict(type='C_CentralCutter',           size=24),
+    dict(type='C_ToTensor'),
+]
+
+train_aug_weak = [
+    dict(type='C_RandomFlip',              prob=0.5, horizontal=True, vertical=True),
+    dict(type='C_RandomAffine',            angle=(0, 360), scale=(0.8, 1.2), shift=(0, 0), order=1),
+    dict(type='C_RandomNoise',             mean=(0, 0), std=(0, 0.02), clip=True),
+    dict(type='C_RandomChannelDrop',       drop_prob=0.1),
+    dict(type='C_CentralCutter',           size=22),
+    dict(type='C_ToTensor'),
+]
+
+train_pipeline = [
+    dict(type='C_MultiView', n_views=[1, 1], transforms=[train_aug_strong, train_aug_weak]),
+    dict(type='C_PackInputs'),
+]
+
+_base_.val_augmentation[0].size = 22
+_base_.val_pipeline[0].transforms = [_base_.val_augmentation]
+
+# ── Dataset ───────────────────────────────────────────────────────────────────
+train_dataset = deepcopy(_base_.dataset)
+train_dataset.update(_base_.dataset_kwargs)
+train_dataset['used_indicies'] = _base_.train_indicies
+train_dataset['pipeline']      = train_pipeline
+train_dataset['mask_patch']    = mask_patch
+
+train_dataloader = dict(
+    batch_size=128,
+    num_workers=16,
+    sampler=dict(type='InfiniteSampler', shuffle=True),
+    collate_fn=dict(type='default_collate'),
+    drop_last=True,
+    dataset=train_dataset,
+)
+
+# ── Eval hook ─────────────────────────────────────────────────────────────────
+dataset_kwargs = dict(
+    h5_filepath=_base_.h5_filepath,
+    used_markers=_base_.used_markers,
+    patch_size=_base_.patch_size,
+    ignore_annotation=_base_.ignore_annotation,
+)
+
+_base_.custom_hooks[0].type           = 'EvaluateModelRich'
+_base_.custom_hooks[0].n_jobs         = 8
+_base_.custom_hooks[0].train_indicies = _base_.train_indicies
+_base_.custom_hooks[0].val_indicies   = _base_.test_indicies
+_base_.custom_hooks[0].pipeline       = _base_.val_pipeline
+_base_.custom_hooks[0].dataset_kwargs = dataset_kwargs
+_base_.custom_hooks[0].annotation_map = {'Cytotoxic CD8': 'CD8', 'TReg': 'Treg'}
+
+# ── Model ─────────────────────────────────────────────────────────────────────
+_base_.model.backbone             = _base_.backbone
+_base_.model.backbone.in_channels = _base_.n_markers
+_base_.model.backbone.mix_channels = 512
+_base_.model.backbone.mix_n_blocks = 8
+_base_.model.neck.in_channels     = 512
+
+work_dir = '/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/ablations/CIM_Funnel/aug_no_shift'
