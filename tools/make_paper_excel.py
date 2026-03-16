@@ -55,16 +55,24 @@ ANNOTATION_MAPS = {
 # Classes to drop from external runs (noise / artefact labels)
 IGNORE_CLASSES = {'Seg Artifact', 'Unidentified'}
 
-# ── External model locations in LOCAL_ZRUNS ───────────────────────────────────
-# Format: {ds_name: [(display_name, folder_name), ...]}
+# ── External model locations ───────────────────────────────────────────────────
+# Single-split models loaded from LOCAL_ZRUNS (old-format metrics.json).
+# CV models (MIBI_TNBC, IMC_NB_TumorSub) loaded from paper_clean via DS_FOLDS.
+# Format: {ds_name: [(display_name, folder_or_None), ...]}
+# folder_or_None=None means load from paper_clean (CV, fold-averaged).
 EXTERNAL_MODELS = {
     'CODEX_cHL': [
         ('ExprBaseline', 'CODEX_cHL_ExprBaseline_mean'),
     ],
-    'MIBI_TNBC': [
-        ('ExprBaseline', 'MIBI_TNBC_ExprBaseline_mean'),
+    'CODEX_cHL_KRONOS18': [
+        ('ExprBaseline', None),   # paper_clean/CODEX_cHL_KRONOS18/ExprBaseline/metrics.json
     ],
-    'IMC_NB_TumorSub': [],
+    'MIBI_TNBC': [
+        ('ExprBaseline', None),   # paper_clean/MIBI_TNBC/ExprBaseline/fold_*/metrics.json
+    ],
+    'IMC_NB_TumorSub': [
+        ('ExprBaseline', None),   # paper_clean/IMC_NB_TumorSub/ExprBaseline/fold_*/metrics.json
+    ],
 }
 
 # ── KRONOS per-class AP (Table S7, arXiv:2506.03373, mean over 4 folds) ───────
@@ -207,11 +215,64 @@ def load_external_metrics(ds_name, folder):
     return None
 
 
+def load_external_metrics_paper_clean(ds_name, model_name):
+    """Load + average metrics from paper_clean (handles single split and CV folds)."""
+    folds = DS_FOLDS[ds_name]
+    all_pc = defaultdict(list)
+    scalar_keys = ['lp_balanced', 'lp_macro_f1', 'lp_map', 'knn_balanced',
+                   'nmi', 'ari', 'clisi_norm', 'ilisi_norm']
+    scalar_vals = defaultdict(list)
+
+    for fold in folds:
+        p = metrics_json_path(ds_name, model_name, fold)
+        if not p.exists():
+            continue
+        d = json.load(open(p))
+        amap   = ANNOTATION_MAPS.get(ds_name, {})
+        ignore = IGNORE_CLASSES
+
+        lp_val = d.get('linear_probe', {}).get('val', {})
+        knn    = d.get('knn', {}).get('val', {}).get('top1_balanced_accuracy', '')
+        clus   = d.get('clustering', {}).get('val', {})
+        cl     = d.get('clisi', {})
+        il     = d.get('ilisi', {})
+        pc_raw = lp_val.get('per_class_ap', {})
+        pc     = _normalise_class_names(pc_raw, amap, ignore)
+
+        for cls, ap in pc.items():
+            all_pc[cls].append(ap)
+
+        def _add(key, val):
+            if val != '':
+                scalar_vals[key].append(val)
+
+        _add('lp_balanced',  lp_val.get('top1_balanced_accuracy', ''))
+        _add('lp_macro_f1',  lp_val.get('f1', ''))
+        _add('lp_map',       np.mean(list(pc.values())) if pc else lp_val.get('mean_average_precision', ''))
+        _add('knn_balanced', knn)
+        _add('nmi',          clus.get('nmi', ''))
+        _add('ari',          clus.get('ari', ''))
+        _add('clisi_norm',   cl.get('normalised', ''))
+        _add('ilisi_norm',   il.get('normalised', ''))
+
+    if not scalar_vals:
+        return None
+
+    result = {k: float(np.mean(v)) for k, v in scalar_vals.items()}
+    result['per_class_ap'] = {cls: float(np.mean(v)) for cls, v in all_pc.items()}
+    result['n_classes']    = len(all_pc)
+    return result
+
+
 def get_external_models(ds_name):
     """Return list of (display_name, metrics_dict) for external models on ds_name."""
     result = []
     for display_name, folder in EXTERNAL_MODELS.get(ds_name, []):
-        m = load_external_metrics(ds_name, folder)
+        if folder is None:
+            # Load from paper_clean (single split or CV-averaged)
+            m = load_external_metrics_paper_clean(ds_name, display_name)
+        else:
+            m = load_external_metrics(ds_name, folder)
         if m is not None:
             result.append((display_name, m))
     return result

@@ -184,6 +184,20 @@ Configs: `configs/_experiments_/paper/<DATASET>/`
 Results: `/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean/<DATASET>/<MODEL>/`
 Excel: `paper_results.xlsx` (synced locally; 8 sheets including `_AP` per-class sheets with KRONOS reference column)
 
+## External / Baseline Models
+
+### ExprBaseline
+Mean marker intensity per cell (scalar per marker → `[n_markers]` feature vector). CPU-only, produced by `tools/baseline_expression.py`. Results stored in `paper_clean/<DATASET>/ExprBaseline/` (single split) or `paper_clean/<DATASET>/ExprBaseline/fold_<k>/` (CV). Loaded into Excel via `EXTERNAL_MODELS` dict in `make_paper_excel.py`.
+
+### DINOv2 / UNI / CA-MAE (KRONOS paper description)
+The KRONOS paper (arXiv:2506.03373) uses these external models as follows — **note: our implementation differs** (see below):
+
+**DINOv2 (ViT-L/14)** and **UNI (ViT-L/16)**: Each marker channel is individually replicated to 3×RGB and passed through the model. The CLS token is extracted per marker and concatenated → feature vector of size `1024 × M`. Images are center-cropped to multiples of the patch token size (14px). Marker channels normalised with marker-specific mean/std from SPM-47M dataset.
+
+**CA-MAE**: Channel-agnostic masked autoencoder pretrained on fluorescence cell profiling (RxRx360 + JUMP-CP). Accepts arbitrary channel counts natively. Marker-wise embeddings of size `384 × M`.
+
+**Our implementation** (`src/models_external.py`) differs: we use a single-channel `patch_embed.proj` (Conv2d 1→D), process all markers as a joint token sequence with shared positional embeddings tiled C times, and return a **single CLS token** rather than per-marker CLS + concat. This allows cross-marker attention in the ViT but produces lower-dimensional features (`D` vs `1024×M`). Results were poor; models removed from paper Excel pending reassessment of implementation.
+
 ## Ablation Experiments
 
 Configs: `configs/_experiments_/ablations/CIM_Funnel/`
