@@ -38,6 +38,30 @@ METRIC_LABELS = {
 MODEL_ORDER = ['CIM', 'CIM_LateFusion', 'CIM_Funnel_Large', 'ResNet']
 DATASETS    = ['CODEX_cHL', 'CODEX_cHL_KRONOS18', 'MIBI_TNBC', 'IMC_NB_TumorSub']
 
+# ── External reference results (from papers) ──────────────────────────────────
+# KRONOS per-class AP on cHL, 18-marker panel (Table S7, arXiv:2506.03373)
+# Mean over 4 folds; overall average mAP = 0.7614 ± 0.0084
+KRONOS_AP = {
+    'CODEX_cHL_KRONOS18': {
+        'B':           0.7927,
+        'CD4':         0.8369,
+        'CD8':         0.9089,
+        'DC':          0.6817,
+        'Endothelial': 0.8473,
+        'Epithelial':  0.6186,
+        'Lymphatic':   0.9053,
+        'M1':          0.5368,
+        'M2':          0.7317,
+        'Mast':        0.8357,
+        'Monocyte':    0.5737,
+        'NK':          0.7747,
+        'Neutrophil':  0.7505,
+        'Other':       0.6458,
+        'Treg':        0.8150,
+        'Tumor':       0.9267,
+    },
+}
+
 # ── Load CSV ──────────────────────────────────────────────────────────────────
 rows = list(csv.DictReader(open(CSV)))
 
@@ -118,6 +142,9 @@ def build_per_class_table(ds_name):
             if all_classes is None:
                 all_classes = sorted(ap.keys())
 
+    # External reference AP per class (KRONOS_AP[ds_name] = {class: float})
+    kronos_ap = KRONOS_AP.get(ds_name, {})
+
     if not all_classes:
         return None
 
@@ -126,6 +153,9 @@ def build_per_class_table(ds_name):
         for model in MODEL_ORDER:
             if model in model_aps:
                 row[model] = f"{model_aps[model].get(cls, ''):.4f}" if model_aps[model].get(cls, '') != '' else ''
+        if kronos_ap:
+            v = kronos_ap.get(cls, '')
+            row['KRONOS'] = f'{v:.4f}' if v != '' else ''
         rows_out.append(row)
 
     # Append mean row
@@ -133,6 +163,8 @@ def build_per_class_table(ds_name):
     for model in MODEL_ORDER:
         if model in model_aps:
             mean_row[model] = f"{np.mean(list(model_aps[model].values())):.4f}"
+    if kronos_ap:
+        mean_row['KRONOS'] = f"{np.mean(list(kronos_ap.values())):.4f}"
     rows_out.append(mean_row)
 
     return pd.DataFrame(rows_out)
