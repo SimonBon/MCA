@@ -17,7 +17,7 @@ from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 NB   = '/nobackup/lab_taschner-mandl/simongutwein'
-RUNS = f'{NB}/z_RUNS/paper'
+RUNS = f'{NB}/z_RUNS/paper_clean'
 
 DATASETS = {
     'CODEX_cHL': {

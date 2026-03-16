@@ -96,4 +96,4 @@ _base_.model.backbone             = _base_.backbone
 _base_.model.backbone.in_channels = _base_.n_markers
 _base_.model.neck.in_channels     = _base_.mix_channels  # 512
 
-work_dir = '/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper/IMC_NB_TumorSub/CIM_Funnel_Large/fold_3'
+work_dir = '/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean/IMC_NB_TumorSub/CIM_Funnel_Large/fold_3'

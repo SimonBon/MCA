@@ -61,4 +61,4 @@ _base_.model.backbone             = _base_.backbone
 _base_.model.backbone.in_channels = _base_.n_markers
 _base_.model.neck.in_channels     = _base_.n_markers * _base_.features_per_marker
 
-work_dir = '/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper/IMC_NB_TumorSub/CIM_LateFusion/fold_0'
+work_dir = '/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean/IMC_NB_TumorSub/CIM_LateFusion/fold_0'

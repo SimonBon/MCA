@@ -3,7 +3,7 @@
 **Date started:** 2026-03-16
 **Cluster:** CeMM SLURM (login.int.cemm.at), L4 GPU nodes
 **Code repo:** `/home/sgutwein/src/MCA` (GitHub: SimonBon/MCA)
-**Output root:** `/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper/`
+**Output root:** `/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean/`
 
 ---
 
