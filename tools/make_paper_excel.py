@@ -258,7 +258,8 @@ def load_external_metrics_paper_clean(ds_name, model_name):
     if not scalar_vals:
         return None
 
-    result = {k: float(np.mean(v)) for k, v in scalar_vals.items()}
+    # Store per-fold lists so build_summary_table can compute mean±std
+    result = {k: v for k, v in scalar_vals.items()}
     result['per_class_ap'] = {cls: float(np.mean(v)) for cls, v in all_pc.items()}
     result['n_classes']    = len(all_pc)
     return result
@@ -307,7 +308,17 @@ def build_summary_table(ds_name):
         row = {'Model': display_name, 'n_classes': ext.get('n_classes', '')}
         for m in METRICS:
             v = ext.get(m, '')
-            row[METRIC_LABELS[m]] = fmt(v) if isinstance(v, float) else ''
+            if isinstance(v, list):
+                if len(v) == 1:
+                    row[METRIC_LABELS[m]] = fmt(v[0])
+                elif len(v) > 1:
+                    row[METRIC_LABELS[m]] = fmt(np.mean(v), np.std(v))
+                else:
+                    row[METRIC_LABELS[m]] = ''
+            elif isinstance(v, float):
+                row[METRIC_LABELS[m]] = fmt(v)
+            else:
+                row[METRIC_LABELS[m]] = ''
         rows_out.append(row)
 
     return pd.DataFrame(rows_out)
