@@ -28,20 +28,22 @@ Never use `ssh login.int.cemm.at` — it requires a password and will be denied.
 
 ### SLURM Job Queues
 
-**GPU jobs** use `--partition=gpu --qos=gpu --gres=gpu:l4_gpu:1`:
+**Every partition requires `--qos=<partition-name>`** — the QOS name always matches the partition name exactly.
+
+**GPU jobs:**
 ```bash
 sbatch --partition=gpu --qos=gpu --gres=gpu:l4_gpu:1 --ntasks=1 \
   --cpus-per-task=16 --mem=64G --time=02:00:00 \
   --output=/home/sgutwein/logs/<name>_%j.log ...
 ```
 
-**CPU jobs** use a CPU partition — **no `--qos` flag, no `--gres`**:
+**CPU jobs** (no `--gres`):
 ```bash
-sbatch --partition=shortq --ntasks=1 --cpus-per-task=16 --mem=32G --time=02:00:00 \
+sbatch --partition=shortq --qos=shortq --ntasks=1 --cpus-per-task=16 --mem=32G --time=02:00:00 \
   --output=/home/sgutwein/logs/<name>_%j.log ...
 ```
 
-CPU queue reference:
+Queue reference:
 
 | Queue | Time limit | Group limit | Nodes | Use for |
 |---|---|---|---|---|
@@ -49,9 +51,7 @@ CPU queue reference:
 | `shortq` | 12h | 200 | 20 | standard CPU jobs (baseline, analysis) |
 | `mediumq` | 2d | 50 | 13 | longer CPU jobs |
 | `longq` | 30d | 30 | 8 | very long CPU jobs |
-| `gpu` | 3d | — | 18 | GPU training (use with `--qos=gpu --gres=gpu:l4_gpu:1`) |
-
-**Important**: CPU partitions (`tinyq`, `shortq`, `mediumq`, `longq`) do **not** accept `--qos`. Only the `gpu` partition uses `--qos=gpu`. Mixing these will cause `Invalid qos specification` errors.
+| `gpu` | 3d | — | 18 | GPU training (add `--gres=gpu:l4_gpu:1`) |
 
 For inline `--wrap` commands, avoid shell quoting issues by writing a temp script file and submitting that instead of `--wrap`.
 
