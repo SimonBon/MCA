@@ -60,21 +60,11 @@ IGNORE_CLASSES = {'Seg Artifact', 'Unidentified'}
 EXTERNAL_MODELS = {
     'CODEX_cHL': [
         ('ExprBaseline', 'CODEX_cHL_ExprBaseline_mean'),
-        ('DINOv2',       'CODEX_cHL_DINOv2_vitb14'),
-        ('OpenPhenom',   'CODEX_cHL_OpenPhenom'),
-        ('UNI',          'CODEX_cHL_UNI'),
     ],
     'MIBI_TNBC': [
         ('ExprBaseline', 'MIBI_TNBC_ExprBaseline_mean'),
-        ('DINOv2',       'MIBI_TNBC_DINOv2_vitb14'),
-        ('OpenPhenom',   'MIBI_TNBC_OpenPhenom'),
-        ('UNI',          'MIBI_TNBC_UNI'),
     ],
-    'IMC_NB_TumorSub': [
-        ('DINOv2',     'IMC_NB_TumorSub_DINOv2_vitb14'),
-        ('OpenPhenom', 'IMC_NB_TumorSub_OpenPhenom'),
-        ('UNI',        'IMC_NB_TumorSub_UNI'),
-    ],
+    'IMC_NB_TumorSub': [],
 }
 
 # ── KRONOS per-class AP (Table S7, arXiv:2506.03373, mean over 4 folds) ───────
