@@ -27,20 +27,21 @@ def load(path):
 
 
 def extract(m):
-    lp   = m.get('linear_probe', {})
-    knn  = m.get('knn',          {})
-    clus = m.get('clustering',   {})
-    cl   = m.get('clisi',        {})
-    il   = m.get('ilisi',        {})
+    lp_val  = m.get('linear_probe', {}).get('val',  {})
+    knn_val = m.get('knn',          {}).get('val',  {})
+    clus    = m.get('clustering',   {}).get('val',  {})
+    cl      = m.get('clisi',        {})
+    il      = m.get('ilisi',        {})
     return {
-        'n_classes':    m.get('n_classes',  ''),
-        'lp_balanced':  lp.get('balanced_accuracy', ''),
-        'lp_macro':     lp.get('macro_f1',           ''),
-        'knn_balanced': knn.get('balanced_accuracy',  ''),
-        'nmi':          clus.get('NMI',               ''),
-        'ari':          clus.get('ARI',               ''),
-        'clisi_norm':   cl.get('normalised',          ''),
-        'ilisi_norm':   il.get('normalised',          ''),
+        'n_classes':    m.get('n_classes',                        ''),
+        'lp_balanced':  lp_val.get('top1_balanced_accuracy',     ''),
+        'lp_macro_f1':  lp_val.get('f1',                         ''),
+        'lp_map':       lp_val.get('mean_average_precision',     ''),
+        'knn_balanced': knn_val.get('top1_balanced_accuracy',    ''),
+        'nmi':          clus.get('nmi',                          ''),
+        'ari':          clus.get('ari',                          ''),
+        'clisi_norm':   cl.get('normalised',                     ''),
+        'ilisi_norm':   il.get('normalised',                     ''),
     }
 
 
@@ -74,7 +75,7 @@ for ds in DATASETS:
             rows.append(row)
 
 FIELDS = ['dataset', 'model', 'fold', 'n_classes',
-          'lp_balanced', 'lp_macro', 'knn_balanced',
+          'lp_balanced', 'lp_macro_f1', 'lp_map', 'knn_balanced',
           'nmi', 'ari', 'clisi_norm', 'ilisi_norm']
 
 with open(OUT_CSV, 'w', newline='') as f:
