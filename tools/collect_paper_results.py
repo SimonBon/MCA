@@ -17,7 +17,7 @@ from pathlib import Path
 ROOT    = Path('/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean')
 OUT_CSV = Path('/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean/results.csv')
 
-DATASETS = ['CODEX_cHL', 'MIBI_TNBC', 'IMC_NB_TumorSub']
+DATASETS = ['CODEX_cHL', 'CODEX_cHL_KRONOS18', 'MIBI_TNBC', 'IMC_NB_TumorSub']
 MODELS   = ['CIM', 'CIM_LateFusion', 'CIM_Funnel_Large', 'ResNet']
 
 

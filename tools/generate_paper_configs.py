@@ -28,6 +28,15 @@ DATASETS = {
         'splits': None,      # single split — train.txt / test.txt
         'annotation_map': "{'Cytotoxic CD8': 'CD8', 'TReg': 'Treg'}",
     },
+    'CODEX_cHL_KRONOS18': {
+        'cutter_size': 24,
+        'data': f'{NB}/h5_files/CODEX_cHL',
+        'h5':   'CODEX_cHL.h5',
+        'markers_file': 'used_markers_KRONOS18.txt',
+        'style': 'kwargs',
+        'splits': None,
+        'annotation_map': "{'Cytotoxic CD8': 'CD8', 'TReg': 'Treg'}",
+    },
     'MIBI_TNBC': {
         'cutter_size': 20,
         'data': f'{NB}/h5_files/MIBI_TNBC',
@@ -73,10 +82,11 @@ def _split_paths(ds, fold):
 def _path_override_block(ds_name, ds, train_txt, test_txt):
     """Lines that override _base_ paths to nobackup, style-aware."""
     data, h5 = ds['data'], ds['h5']
+    markers_file = ds.get('markers_file', 'used_markers.txt')
     lines = [
         '# ── Override paths to nobackup ──────────────────────────────────────────────',
         f"_base_.h5_filepath    = '{data}/{h5}'",
-        f"_base_.used_markers   = '{data}/used_markers.txt'",
+        f"_base_.used_markers   = '{data}/{markers_file}'",
         f"_base_.train_indicies = '{train_txt}'",
         f"_base_.test_indicies  = '{test_txt}'",
     ]
