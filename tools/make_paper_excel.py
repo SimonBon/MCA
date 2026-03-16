@@ -62,7 +62,7 @@ IGNORE_CLASSES = {'Seg Artifact', 'Unidentified'}
 # folder_or_None=None means load from paper_clean (CV, fold-averaged).
 EXTERNAL_MODELS = {
     'CODEX_cHL': [
-        ('ExprBaseline', 'CODEX_cHL_ExprBaseline_mean'),
+        ('ExprBaseline', None),   # paper_clean/CODEX_cHL/ExprBaseline/metrics.json
     ],
     'CODEX_cHL_KRONOS18': [
         ('ExprBaseline', None),   # paper_clean/CODEX_cHL_KRONOS18/ExprBaseline/metrics.json
@@ -377,6 +377,67 @@ def build_per_class_table(ds_name):
     return pd.DataFrame(rows_out)
 
 
+# ── Ablation table ────────────────────────────────────────────────────────────
+
+ABLATION_DIR = LOCAL_ZRUNS / 'ablations' / 'CIM_Funnel'
+
+ABLATION_GROUPS = {
+    'Channel Aug':    ['aug_full_8k', 'aug_no_channel', 'aug_no_drop', 'aug_no_shift', 'aug_no_noise', 'aug_drop_005', 'aug_drop_02'],
+    'Training Length':['iters_2k', 'iters_4k', 'aug_full_8k'],
+    'Model Capacity': ['cap_blocks_4', 'aug_full_8k', 'cap_blocks_12', 'cap_ch_256', 'cap_ch_768'],
+}
+
+ABLATION_DISPLAY = {
+    'aug_full_8k':    'Full aug (8k) ★',
+    'aug_no_channel': 'No channel aug',
+    'aug_no_drop':    'No channel drop',
+    'aug_no_shift':   'No channel shift',
+    'aug_no_noise':   'No noise',
+    'aug_drop_005':   'Drop p=0.05',
+    'aug_drop_02':    'Drop p=0.20',
+    'iters_2k':       '2k iters',
+    'iters_4k':       '4k iters',
+    'cap_blocks_4':   '4 mix blocks',
+    'cap_blocks_12':  '12 mix blocks',
+    'cap_ch_256':     '256 mix channels',
+    'cap_ch_768':     '768 mix channels',
+}
+
+
+def build_ablation_table():
+    rows_out = []
+    seen = set()
+    for group, variants in ABLATION_GROUPS.items():
+        for name in variants:
+            key = (group, name)
+            if key in seen:
+                continue
+            seen.add(key)
+            p = ABLATION_DIR / name / 'metrics.json'
+            if not p.exists():
+                continue
+            d = json.load(open(p))
+            lp_val = d.get('linear_probe', {}).get('val', {})
+            knn    = d.get('knn', {}).get('val', {}).get('top1_balanced_accuracy', '')
+            clus   = d.get('clustering', {}).get('val', {})
+            cl     = d.get('clisi', {})
+            il     = d.get('ilisi', {})
+            row = {
+                'Group':   group,
+                'Variant': ABLATION_DISPLAY.get(name, name),
+                METRIC_LABELS['lp_balanced']:  fmt(lp_val['top1_balanced_accuracy']) if 'top1_balanced_accuracy' in lp_val else '',
+                METRIC_LABELS['lp_macro_f1']:  fmt(lp_val['f1'])                    if 'f1' in lp_val else '',
+                METRIC_LABELS['lp_map']:       fmt(lp_val['mean_average_precision']) if 'mean_average_precision' in lp_val else '',
+                METRIC_LABELS['knn_balanced']: fmt(knn) if isinstance(knn, float) else '',
+                METRIC_LABELS['nmi']:          fmt(clus['nmi']) if 'nmi' in clus else '',
+                METRIC_LABELS['ari']:          fmt(clus['ari']) if 'ari' in clus else '',
+                METRIC_LABELS['clisi_norm']:   fmt(cl['normalised']) if 'normalised' in cl else '',
+                METRIC_LABELS['ilisi_norm']:   fmt(il['normalised']) if 'normalised' in il else '',
+            }
+            rows_out.append(row)
+    return pd.DataFrame(rows_out)
+
+
 # ── Write Excel ───────────────────────────────────────────────────────────────
 def autosize(ws):
     for col in ws.columns:
@@ -399,5 +460,11 @@ with pd.ExcelWriter(XLSX, engine='openpyxl') as writer:
             pc_sheet = (ds + '_AP')[:31]
             df_pc.to_excel(writer, sheet_name=pc_sheet, index=False)
             autosize(writer.sheets[pc_sheet])
+
+    df_abl = build_ablation_table()
+    if not df_abl.empty:
+        df_abl.to_excel(writer, sheet_name='Ablations', index=False)
+        autosize(writer.sheets['Ablations'])
+        print(f'  Ablations sheet: {len(df_abl)} rows')
 
 print(f'Written {XLSX}')
