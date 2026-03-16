@@ -6,6 +6,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Self-supervised cell representation learning for multiplexed imaging (CODEX, IMC, MIBI-TOF). Cells are represented as multi-channel image patches (one channel per protein marker). Models learn embeddings via VICReg that are useful for cell-type classification, clustering, and spatial analysis.
 
+## Cluster Access
+
+Always connect with:
+```bash
+ssh cemm
+```
+Never use `ssh login.int.cemm.at` — it requires a password and will be denied.
+
+### Key Paths on the Cluster
+
+| Purpose | Path |
+|---|---|
+| Repo | `/home/sgutwein/src/MCA` |
+| mmselfsup train script | `/home/sgutwein/src/mmselfsup/tools/train.py` |
+| Conda env | `/nobackup/lab_taschner-mandl/simongutwein/miniconda3/envs/mca310` |
+| H5 data files | `/nobackup/lab_taschner-mandl/simongutwein/h5_files/<DATASET>/` |
+| Paper results | `/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean/` |
+| Ablation results | `/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/ablations/CIM_Funnel/` |
+| SLURM logs | `/home/sgutwein/logs/` |
+
 ## Training
 
 Training uses the external **mmselfsup** train script — it is not inside this repo:
@@ -13,7 +33,8 @@ Training uses the external **mmselfsup** train script — it is not inside this 
 **On the CeMM cluster (SLURM):**
 ```bash
 # Single config
-sbatch --wrap="source /nobackup/.../miniconda3/etc/profile.d/conda.sh && conda activate mca310 && \
+sbatch --wrap="source /nobackup/lab_taschner-mandl/simongutwein/miniconda3/etc/profile.d/conda.sh && \
+  conda activate mca310 && \
   export PYTHONPATH=/home/sgutwein/src:$PYTHONPATH && \
   python /home/sgutwein/src/mmselfsup/tools/train.py configs/_experiments_/paper/CODEX_cHL/CIM_VICReg.py" \
   --partition=gpu --qos=gpu --gres=gpu:l4_gpu:1 --ntasks=1 --cpus-per-task=16 --mem=64G --time=02:00:00 \
@@ -27,8 +48,6 @@ python /home/sgutwein/src/mmselfsup/tools/train.py <config.py> --resume auto
 ```bash
 DEBUG=1 CUDA_VISIBLE_DEVICES=0 python /path/to/mmselfsup/tools/train.py configs/...py
 ```
-
-**SSH alias**: always use `ssh cemm` (not `ssh login.int.cemm.at`).
 
 ## Config System
 
@@ -75,8 +94,8 @@ python tools/collect_paper_results.py
 python tools/make_paper_excel.py
 ```
 
-Results land in `/nobackup/.../z_RUNS/paper_clean/<DATASET>/<MODEL>/metrics.json`.
-Ablations land in `/nobackup/.../z_RUNS/ablations/CIM_Funnel/<variant>/metrics.json`.
+Results land in `/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean/<DATASET>/<MODEL>/metrics.json`.
+Ablations land in `/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/ablations/CIM_Funnel/<variant>/metrics.json`.
 
 ## Architecture
 
@@ -133,13 +152,13 @@ The `epochs` parameter controls LP solver `max_iter`, **not** the evaluation int
 | IMC_NB_TumorSub | 5-fold CV | same |
 
 Configs: `configs/_experiments_/paper/<DATASET>/`
-Results: `/nobackup/.../z_RUNS/paper_clean/<DATASET>/<MODEL>/`
+Results: `/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean/<DATASET>/<MODEL>/`
 Excel: `paper_results.xlsx` (synced locally; 8 sheets including `_AP` per-class sheets with KRONOS reference column)
 
 ## Ablation Experiments
 
 Configs: `configs/_experiments_/ablations/CIM_Funnel/`
-Results: `/nobackup/.../z_RUNS/ablations/CIM_Funnel/<variant>/`
+Results: `/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/ablations/CIM_Funnel/<variant>/`
 
 Groups:
 - `aug_*` — channel augmentation ablations (no_channel, no_drop, no_shift, no_noise, drop_prob sweep)
