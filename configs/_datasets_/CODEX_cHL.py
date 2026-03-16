@@ -6,6 +6,7 @@ val_indicies = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_
 test_indicies = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/data/MCI_data/h5_files/CODEX_cHL/test.txt'
 
 ignore_annotation = ['Seg Artifact']
+annotation_map    = {'Cytotoxic CD8': 'CD8', 'TReg': 'Treg'}
 
 patch_size = 32
 n_markers = 41

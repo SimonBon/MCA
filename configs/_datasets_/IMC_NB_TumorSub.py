@@ -6,7 +6,7 @@ val_indicies   = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData
 test_indicies  = '/home/simon_g/isilon_images_mnt/10_MetaSystems/MetaSystemsData/_simon/data/MCI_data/h5_files/IMC_NB_TumorSub/test.txt'
 
 # NK_DC has only 111 cells — too few for LP; 'Other' not biologically defined
-ignore_annotation = ['Other', 'NK_DC']
+ignore_annotation = ['Other']
 
 patch_size  = 24
 n_markers   = 31
