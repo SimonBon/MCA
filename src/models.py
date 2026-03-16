@@ -699,6 +699,98 @@ class WideModelProgressiveFusion(nn.Module):
 
 
 @MODELS.register_module()
+class WideModelLateFusion(nn.Module):
+    """
+    Channel-independent backbone (identical sep_stages to WideModel) followed
+    by a 2-layer MLP that performs the first and only cross-channel mixing after
+    global average pooling.
+
+    Flow:
+        depthwise stem → depthwise ConvBlocks → AvgPool(2)×N → global avg pool
+        → flatten → Linear → BN → ReLU → Linear → BN
+        → reshape to [B, out_dim, 1, 1]
+
+    The MLP hidden dim defaults to 4× the input dim (ConvNeXt-style expansion).
+    out_channels defaults to in_channels * stem_width (same as WideModel output).
+
+    Args:
+        in_channels:   Number of input markers.
+        stem_width:    Per-marker expansion factor.
+        block_width:   FFN expansion inside ConvBlocks.
+        layer_config:  ConvBlocks per stage (AvgPool between stages).
+        mlp_ratio:     Hidden dim multiplier for the MLP (default 4).
+        out_channels:  Output dimensionality. Defaults to in_channels*stem_width.
+        drop_prob:     Dropout on conv blocks.
+        input_norm:    L2-normalise input along channel dim before stem.
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        stem_width: int = 16,
+        block_width: int = 4,
+        layer_config=None,
+        mlp_ratio: int = 4,
+        out_channels: int = None,
+        drop_prob: float = 0.05,
+        input_norm: bool = False,
+    ):
+        super().__init__()
+
+        if layer_config is None:
+            layer_config = [2, 2]
+
+        self.in_channels    = in_channels
+        self.input_norm     = input_norm
+        feat_dim            = in_channels * stem_width   # per-channel flat dim
+        out_dim             = out_channels if out_channels is not None else feat_dim
+
+        # ── Channel-independent stem ──────────────────────────────────────────
+        self.stem = nn.Sequential(
+            nn.Conv2d(in_channels, feat_dim, kernel_size=3, padding=1,
+                      groups=in_channels, bias=False),
+            nn.BatchNorm2d(feat_dim),
+            nn.ReLU(inplace=True),
+        )
+
+        sep_layers = []
+        for n_blocks in layer_config:
+            for _ in range(n_blocks):
+                sep_layers.append(ConvBlock(
+                    in_channels=feat_dim, groups=in_channels,
+                    block_width=block_width, drop_prob=drop_prob,
+                ))
+            sep_layers.append(nn.AvgPool2d(kernel_size=2, stride=2))
+        self.sep_stages = nn.Sequential(*sep_layers)
+
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+
+        # ── MLP mixer — first (and only) cross-channel operation ──────────────
+        hidden = feat_dim * mlp_ratio
+        self.mlp = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(feat_dim, hidden, bias=False),
+            nn.BatchNorm1d(hidden),
+            nn.ReLU(inplace=True),
+            nn.Linear(hidden, out_dim, bias=False),
+            nn.BatchNorm1d(out_dim),
+        )
+
+        self.out_dim = out_dim
+
+    def forward(self, x, *args, **kwargs):
+        if self.input_norm:
+            x = F.normalize(x, dim=1)
+
+        x = self.stem(x)
+        x = self.sep_stages(x)
+        x = self.avgpool(x)          # [B, feat_dim, 1, 1]
+        x = self.mlp(x)              # [B, out_dim]
+        x = x.unsqueeze(-1).unsqueeze(-1)   # [B, out_dim, 1, 1]
+        return (x,)
+
+
+@MODELS.register_module()
 class CIM_Funnel(nn.Module):
     """
     Two-phase backbone: channel-independent early, channel-mixing late.
