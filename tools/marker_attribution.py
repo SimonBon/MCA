@@ -240,25 +240,33 @@ def main():
     )
 
     # ── Compute IG ─────────────────────────────────────────────────────────
-    all_attr, all_labels, all_sids = [], [], []
+    all_attr, all_feats, all_labels, all_sids = [], [], [], []
     n_done = 0
 
     for imgs, labels, sids in tqdm(loader, desc='IG'):
         if args.max_cells and n_done >= args.max_cells:
             break
-        attr = ig_batch(backbone, imgs.to(device), args.n_steps)
+        imgs_gpu = imgs.to(device)
+        with torch.no_grad():
+            feats = backbone(imgs_gpu)[0]          # [B, D, 1, 1] or [B, D]
+            feats = feats.flatten(1).cpu().numpy() # [B, D]
+        attr = ig_batch(backbone, imgs_gpu, args.n_steps)
         all_attr.append(attr.numpy())
+        all_feats.append(feats)
         all_labels.extend(labels)
         all_sids.extend(sids)
         n_done += len(labels)
 
-    attr_matrix = np.concatenate(all_attr, axis=0)  # [N, n_markers]
+    attr_matrix = np.concatenate(all_attr,  axis=0)  # [N, n_markers]
+    feat_matrix = np.concatenate(all_feats, axis=0)  # [N, D]
     print(f'\nAttribution matrix: {attr_matrix.shape}')
+    print(f'Feature matrix:     {feat_matrix.shape}')
 
     # ── Save ───────────────────────────────────────────────────────────────
     np.savez_compressed(
         out / 'attribution.npz',
         attribution  = attr_matrix,
+        features     = feat_matrix,
         labels       = np.array(all_labels),
         sample_ids   = np.array(all_sids),
         marker_names = np.array(marker_names),

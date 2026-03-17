@@ -7,17 +7,33 @@ produces interpretable outputs — all without using ground-truth labels.
 
 Labels stored in attribution.npz are only used for validation plots.
 
+Optionally accepts --val_results (path to val_results.npz from the training
+run) to project cells onto the *original embedding UMAP* rather than the
+attribution-space UMAP. Use --ignore / --annotation_map to match the same
+filtering applied in marker_attribution.py so cell counts align.
+
 Usage:
+    # Attribution-space UMAP (default)
     python tools/cluster_attribution.py \\
         --attribution /nobackup/.../marker_attribution/CODEX_cHL_CIM_Funnel/attribution.npz \\
         --out         /nobackup/.../marker_attribution/CODEX_cHL_CIM_Funnel/clusters \\
         --resolution  0.5
 
+    # Original embedding UMAP coloured by marker attribution
+    python tools/cluster_attribution.py \\
+        --attribution  /nobackup/.../marker_attribution/CODEX_cHL_CIM_Funnel/attribution.npz \\
+        --val_results  /nobackup/.../paper_clean/CODEX_cHL/CIM_Funnel_Large/val_results.npz \\
+        --ignore       "Seg Artifact,Unidentified,Other" \\
+        --annotation_map "Cytotoxic CD8:CD8,TReg:Treg" \\
+        --out          /nobackup/.../marker_attribution/CODEX_cHL_CIM_Funnel/clusters_embUMAP \\
+        --resolution   0.5
+
 Outputs:
-    umap_clusters.png     — UMAP coloured by Leiden cluster
-    umap_groundtruth.png  — UMAP coloured by ground-truth label (validation)
-    heatmap.png           — mean attribution per cluster × marker
-    clusters.npz          — cluster assignments + UMAP coords
+    umap_clusters.png          — UMAP coloured by Leiden cluster
+    umap_groundtruth.png       — UMAP coloured by ground-truth label (validation)
+    heatmap.png                — mean attribution per cluster × marker
+    umap_marker_influence.png  — grid: one panel per marker coloured by IG attribution
+    clusters.npz               — cluster assignments + UMAP coords
 """
 
 import argparse
@@ -143,6 +159,7 @@ def plot_marker_panels(attr_matrix, marker_names, coords, out_path, percentile=9
     print(f'  Saved {out_path}')
 
 
+
 def print_cluster_summary(attr_matrix, marker_names, cluster_labels, gt_labels):
     clusters = sorted(set(cluster_labels), key=lambda x: int(x))
     print('\n── Cluster summary ──────────────────────────────────────────────')
@@ -166,12 +183,12 @@ def print_cluster_summary(attr_matrix, marker_names, cluster_labels, gt_labels):
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument('--attribution', required=True, help='Path to attribution.npz')
-    p.add_argument('--out',         required=True)
-    p.add_argument('--resolution',  type=float, default=0.5,
+    p.add_argument('--attribution',    required=True, help='Path to attribution.npz')
+    p.add_argument('--out',            required=True)
+    p.add_argument('--resolution',     type=float, default=0.5,
                    help='Leiden resolution — higher = more clusters')
-    p.add_argument('--n_neighbors', type=int,   default=15)
-    p.add_argument('--n_pcs',       type=int,   default=20,
+    p.add_argument('--n_neighbors',    type=int,   default=15)
+    p.add_argument('--n_pcs',          type=int,   default=20,
                    help='PCA dims before KNN (0 = skip PCA, use raw attribution)')
     return p.parse_args()
 
@@ -211,22 +228,33 @@ def main():
     print(f'  Found {n_clusters} clusters')
 
     # ── UMAP ──────────────────────────────────────────────────────────────
-    print('Computing UMAP...')
-    sc.tl.umap(adata)
-    coords = adata.obsm['X_umap']
+    d_attr = np.load(args.attribution, allow_pickle=True)
+    if 'features' in d_attr:
+        print('Computing UMAP from backbone features (embedding space)...')
+        features = d_attr['features'].astype(np.float32)
+        adata_emb = ad.AnnData(X=features)
+        sc.pp.neighbors(adata_emb, n_neighbors=15, use_rep='X', metric='cosine')
+        sc.tl.umap(adata_emb)
+        coords = adata_emb.obsm['X_umap']
+        umap_title_suffix = '(embedding space)'
+    else:
+        print('Computing UMAP from attribution space (no features in npz)...')
+        sc.tl.umap(adata)
+        coords = adata.obsm['X_umap']
+        umap_title_suffix = '(attribution space)'
 
     cluster_labels = adata.obs['leiden'].values.astype(str)
 
     plot_umap(coords, cluster_labels,
-              title=f'Leiden clusters (res={args.resolution}, n={n_clusters})',
+              title=f'Leiden clusters (res={args.resolution}, n={n_clusters}) {umap_title_suffix}',
               out_path=out / 'umap_clusters.png')
 
     plot_umap(coords, labels,
-              title='Ground-truth labels (validation only)',
+              title=f'Ground-truth labels {umap_title_suffix}',
               out_path=out / 'umap_groundtruth.png')
 
     plot_umap(coords, sample_ids,
-              title='Sample IDs',
+              title=f'Sample IDs {umap_title_suffix}',
               out_path=out / 'umap_samples.png')
 
     # ── Heatmap ───────────────────────────────────────────────────────────
