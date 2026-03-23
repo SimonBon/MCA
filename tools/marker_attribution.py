@@ -1,28 +1,31 @@
 #!/usr/bin/env python3
-"""Per-cell marker attribution via Integrated Gradients.
+"""Per-cell marker attribution via Integrated Gradients, visualised on the
+training-run UMAP.
 
-Computes a [N_cells × n_markers] importance matrix:
-  For each cell, which markers drove its position in embedding space?
+Uses MCIDataset (same class and val indices as the training eval hook) so
+cell ordering is guaranteed to match umap_embeddings.npz.
 
-Loads data directly from HDF5 (no mmengine dataset pipeline) to avoid
-module registration conflicts. Model is loaded via src.utils.load_checkpoint.
+Workflow:
+  1. Load backbone  →  Config.fromfile registers MCIDataset in mmengine
+  2. Build val dataset via MCIDataset (same ordering as training val hook)
+  3. Compute IG attribution  [N, n_markers]  per cell
+  4. Load umap_embeddings.npz  →  same N cells, same order  →  direct overlay
+  5. Plot per-marker UMAP panels coloured by IG attribution
+  6. Save attribution.npz
 
-Attribution target: ||f(x)||²  — fully unsupervised, no labels used.
-Attribution = (input - baseline) * mean_gradients  [Integrated Gradients]
-Spatial dims summed → one importance value per marker per cell.
-
-Usage (on cluster, GPU recommended):
+Usage:
     python tools/marker_attribution.py \\
-        --model_dir /nobackup/.../paper_clean/CODEX_cHL/CIM_Funnel_Large \\
-        --h5        /nobackup/.../h5_files/CODEX_cHL/CODEX_cHL.h5 \\
-        --markers   /nobackup/.../h5_files/CODEX_cHL/used_markers.txt \\
-        --val       /nobackup/.../h5_files/CODEX_cHL/test.txt \\
-        --out       /nobackup/.../z_RUNS/marker_attribution/CODEX_cHL_CIM_Funnel \\
+        --model_dir  /nobackup/.../paper_clean/CODEX_cHL/CIM_Funnel_Large \\
+        --h5         /nobackup/.../h5_files/CODEX_cHL/CODEX_cHL.h5 \\
+        --markers    /nobackup/.../h5_files/CODEX_cHL/used_markers.txt \\
+        --val        /nobackup/.../h5_files/CODEX_cHL/test.txt \\
+        --umap_emb   /nobackup/.../paper_clean/CODEX_cHL/CIM_Funnel_Large/umap_embeddings.npz \\
+        --out        /nobackup/.../marker_attribution/CODEX_cHL_CIM_Funnel \\
         --annotation_map "Cytotoxic CD8:CD8,TReg:Treg"
 
 Outputs:
-    attribution.npz   — [N, n_markers] importance matrix + labels + sample_ids
-    marker_names.txt  — marker names in column order
+    attribution.npz          — [N, n_markers] IG matrix + labels + sample_ids
+    umap_marker_influence.png — grid: one UMAP panel per marker
 """
 
 import argparse
@@ -39,116 +42,69 @@ for _p in [str(_MCA), str(_SRC)]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-import h5py
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
-# ── Model loading ──────────────────────────────────────────────────────────────
+
+# ── Model + dataset loading ────────────────────────────────────────────────────
 
 def load_backbone(model_dir, device):
-    """Load backbone via src.utils.load_checkpoint (handles Config.fromfile)."""
+    """Load backbone; Config.fromfile registers MCIDataset as a side-effect."""
     from src.utils import load_checkpoint
     result   = load_checkpoint(str(model_dir), device=device)
     backbone = result['model'].backbone.eval()
     return backbone
 
 
-# ── HDF5 Dataset ───────────────────────────────────────────────────────────────
+def build_val_dataset(h5, markers, val, patch_size, annotation_map, ignore):
+    """Build MCIDataset from the mmengine registry (registered by load_backbone).
 
-def decode(x):
-    return x.decode() if isinstance(x, bytes) else x
+    Returns the dataset with pipeline=None so __getitem__ returns the raw dict.
+    Cell ordering is identical to the training val hook.
+    """
+    from mmengine.registry import DATASETS
+    MCIDataset = DATASETS.get('MCIDataset')
+
+    ignore_list = [s.strip() for s in ignore.split(',') if s.strip()] if ignore else None
+
+    dataset = MCIDataset(
+        h5_filepath       = h5,
+        patch_size        = patch_size,
+        used_markers      = markers,
+        used_indicies     = val,
+        pipeline          = None,       # returns raw dict
+        ignore_annotation = ignore_list,
+        mask_patch        = True,
+        annotation_map    = annotation_map,
+    )
+    return dataset
 
 
-class PatchDataset(Dataset):
-    """Load cell patches directly from HDF5, mirroring MCIDataset behaviour."""
-
-    def __init__(self, h5_path, marker_indices, indices_path,
-                 patch_size, annotation_map, ignore):
-        self.h5_path       = h5_path
-        self.marker_indices = marker_indices
-        self.patch_size    = patch_size
-        self.half          = patch_size // 2
-        self.annotation_map = annotation_map
-        self.ignore        = set(ignore or [])
-        self._h5           = None
-
-        with h5py.File(h5_path, 'r') as f:
-            all_sids  = np.array([decode(s) for s in f['coords']['sample_id'][:]])
-            all_dim1  = f['coords']['DIM1'][:].astype(int)
-            all_dim2  = f['coords']['DIM2'][:].astype(int)
-            all_annot = np.array([decode(a) for a in f['annotation'][:]])
-
-        # Filter to requested indices
-        with open(indices_path) as fh:
-            idx = np.array([int(l.strip()) for l in fh if l.strip()])
-
-        self.dim1      = all_dim1[idx]
-        self.dim2      = all_dim2[idx]
-        self.sample_id = all_sids[idx]
-        self.labels    = np.array([
-            annotation_map.get(a, a) for a in all_annot[idx]
-        ])
-
-        # Filter ignored classes
-        keep = np.array([l not in self.ignore for l in self.labels])
-        self.dim1      = self.dim1[keep]
-        self.dim2      = self.dim2[keep]
-        self.sample_id = self.sample_id[keep]
-        self.labels    = self.labels[keep]
-
-    def _open(self):
-        if self._h5 is None:
-            self._h5 = h5py.File(self.h5_path, 'r')
-
-    def __len__(self):
-        return len(self.dim1)
-
-    def __getitem__(self, idx):
-        self._open()
-        d1, d2, sid = self.dim1[idx], self.dim2[idx], self.sample_id[idx]
-        half = self.half
-        ps   = self.patch_size
-
-        grp   = self._h5['data'][sid]
-        H, W  = grp['image'].shape[:2]
-        r0, r1 = d1 - half, d1 + half
-        c0, c1 = d2 - half, d2 + half
-        pr0, pr1 = max(0, -r0), max(0, r1 - H)
-        pc0, pc1 = max(0, -c0), max(0, c1 - W)
-        r0c, r1c = max(0, r0), min(H, r1)
-        c0c, c1c = max(0, c0), min(W, c1)
-
-        chunk = grp['image'][r0c:r1c, c0c:c1c, :][:, :, self.marker_indices].astype(np.float32)
-        patch = np.zeros((ps, ps, len(self.marker_indices)), dtype=np.float32)
-        patch[pr0:pr0 + (r1c - r0c), pc0:pc0 + (c1c - c0c)] = chunk
-
-        # mask to centre cell only
-        mchunk = grp['masks'][r0c:r1c, c0c:c1c]
-        msk    = np.zeros((ps, ps), dtype=mchunk.dtype)
-        msk[pr0:pr0 + (r1c - r0c), pc0:pc0 + (c1c - c0c)] = mchunk
-        centre = msk[half, half]
-        patch *= (msk == centre)[:, :, None]
-
-        # central crop to patch_size, [C, H, W], normalise to [0, 1]
-        img = torch.from_numpy(patch).permute(2, 0, 1)  # [C, H, W]
+def collate(batch):
+    """Convert list of MCIDataset dicts → (imgs [B,C,H,W], labels, sample_ids)."""
+    imgs = []
+    labels, sids = [], []
+    for d in batch:
+        img = torch.from_numpy(d['img']).permute(2, 0, 1).float()  # [C,H,W]
         img = img / (img.amax() + 1e-8)
-        return img, self.labels[idx], self.sample_id[idx]
+        imgs.append(img)
+        labels.append(d['annotation'])
+        sids.append(d['sample_id'])
+    return torch.stack(imgs), labels, sids
 
 
 # ── Integrated Gradients ───────────────────────────────────────────────────────
 
 def ig_batch(backbone, imgs, n_steps):
-    """
-    Integrated Gradients for a batch.
+    """Integrated Gradients. Target: ||f(x)||². Baseline: zero patch.
 
-    Target: ||backbone(x)||²  — fully unsupervised.
-    Baseline: zero patch (no marker expression).
-
-    Returns:
-        attribution [B, C]  — absolute IG summed over spatial dims
+    Returns attribution [B, C] — abs IG summed over spatial dims.
     """
     baseline   = torch.zeros_like(imgs)
     grad_accum = torch.zeros_like(imgs)
@@ -156,13 +112,77 @@ def ig_batch(backbone, imgs, n_steps):
     for step in range(n_steps):
         alpha    = step / max(n_steps - 1, 1)
         x_interp = (baseline + alpha * (imgs - baseline)).detach().requires_grad_(True)
-        emb      = backbone(x_interp)[0]      # [B, D, 1, 1] or [B, D]
+        emb      = backbone(x_interp)[0]
         emb.pow(2).sum().backward()
         grad_accum += x_interp.grad.detach()
 
     avg_grads   = grad_accum / n_steps
-    attribution = ((imgs - baseline) * avg_grads).abs()  # [B, C, H, W]
-    return attribution.sum(dim=[-2, -1]).cpu()            # [B, C]
+    attribution = ((imgs - baseline) * avg_grads).abs()
+    return attribution.sum(dim=[-2, -1]).cpu()   # [B, C]
+
+
+# ── Visualisation ──────────────────────────────────────────────────────────────
+
+def plot_marker_panels(attr_matrix, marker_names, umap_coords, labels,
+                       out_path, percentile=99):
+    """Grid of UMAPs: one panel per marker, coloured by row-normalised IG.
+
+    umap_coords: [N, 2]  — from umap_embeddings.npz, same cell order.
+    """
+    attr_norm = attr_matrix / (attr_matrix.sum(axis=1, keepdims=True) + 1e-8)
+
+    n     = len(marker_names)
+    ncols = 8
+    nrows = int(np.ceil(n / ncols))
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 2.2, nrows * 2.0))
+    axes = axes.flatten()
+
+    for i, name in enumerate(marker_names):
+        ax   = axes[i]
+        val  = attr_norm[:, i]
+        vmax = np.percentile(val, percentile)
+        sc   = ax.scatter(umap_coords[:, 0], umap_coords[:, 1],
+                          c=val, s=1, alpha=0.6, linewidths=0,
+                          cmap='YlOrRd', vmin=0, vmax=vmax)
+        ax.set_title(name, fontsize=7, pad=2)
+        ax.set_xticks([]); ax.set_yticks([])
+        plt.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
+
+    for j in range(i + 1, len(axes)):
+        axes[j].set_visible(False)
+
+    fig.suptitle('Marker attribution influence (IG) on original embedding UMAP\n'
+                 '(row-normalised, per-marker colour scale)',
+                 fontsize=10, y=1.01)
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    print(f'  Saved {out_path}')
+
+
+def plot_umap_groundtruth(umap_coords, labels, out_path):
+    import matplotlib.cm as cm
+    categories = sorted(set(labels))
+    palette    = cm.get_cmap('tab20', len(categories))
+    cmap_dict  = {c: palette(i) for i, c in enumerate(categories)}
+    colors     = [cmap_dict[l] for l in labels]
+
+    fig, ax = plt.subplots(figsize=(8, 7))
+    ax.scatter(umap_coords[:, 0], umap_coords[:, 1],
+               c=colors, s=2, alpha=0.5, linewidths=0)
+    handles = [plt.Line2D([0], [0], marker='o', color='w',
+                           markerfacecolor=cmap_dict[c], markersize=6, label=c)
+               for c in categories]
+    ax.legend(handles=handles, bbox_to_anchor=(1.01, 1), loc='upper left',
+              fontsize=7, frameon=False)
+    ax.set_title('Ground-truth labels (original embedding UMAP)')
+    ax.set_xlabel('UMAP 1'); ax.set_ylabel('UMAP 2')
+    ax.set_xticks([]); ax.set_yticks([])
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f'  Saved {out_path}')
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -173,14 +193,17 @@ def parse_args():
     p.add_argument('--h5',             required=True)
     p.add_argument('--markers',        required=True)
     p.add_argument('--val',            required=True)
+    p.add_argument('--umap_emb',       default=None,
+                   help='Path to umap_embeddings.npz from the training run. '
+                        'If omitted, UMAP is computed from backbone features.')
     p.add_argument('--out',            required=True)
     p.add_argument('--annotation_map', default=None,
                    help='e.g. "Cytotoxic CD8:CD8,TReg:Treg"')
-    p.add_argument('--ignore',         default='Unidentified',
+    p.add_argument('--ignore',         default=None,
                    help='Comma-separated class names to ignore')
     p.add_argument('--patch_size',     type=int, default=22)
-    p.add_argument('--n_steps',        type=int, default=50)
-    p.add_argument('--batch_size',     type=int, default=32)
+    p.add_argument('--n_steps',        type=int, default=20)
+    p.add_argument('--batch_size',     type=int, default=64)
     p.add_argument('--max_cells',      type=int, default=None)
     p.add_argument('--n_workers',      type=int, default=8)
     p.add_argument('--device',         default=None)
@@ -204,42 +227,34 @@ def main():
             k, v = pair.split(':')
             annotation_map[k.strip()] = v.strip()
 
-    ignore = [s.strip() for s in args.ignore.split(',') if s.strip()]
-
-    # ── Load backbone (registers all mmengine modules via Config.fromfile) ──
+    # ── 1. Load backbone (registers MCIDataset) ────────────────────────────
     print('Loading backbone...')
     backbone = load_backbone(args.model_dir, device)
 
-    with open(args.markers) as f:
-        marker_names = [l.strip() for l in f if l.strip()]
-    print(f'{len(marker_names)} markers: {marker_names[:5]} ...')
-
-    # ── Build marker index map from HDF5 ───────────────────────────────────
-    with h5py.File(args.h5, 'r') as f:
-        all_marker_names = [decode(m) for m in f['marker_names'][:]]
-    m2i            = {m: i for i, m in enumerate(all_marker_names)}
-    marker_indices = np.array([m2i[m] for m in marker_names])
-
-    # ── Dataset + DataLoader ───────────────────────────────────────────────
-    dataset = PatchDataset(
-        h5_path        = args.h5,
-        marker_indices = marker_indices,
-        indices_path   = args.val,
-        patch_size     = args.patch_size,
+    # ── 2. Build val dataset via MCIDataset (same order as training hook) ──
+    print('Building val dataset (MCIDataset)...')
+    dataset = build_val_dataset(
+        h5           = args.h5,
+        markers      = args.markers,
+        val          = args.val,
+        patch_size   = args.patch_size,
         annotation_map = annotation_map,
-        ignore         = ignore,
+        ignore       = args.ignore,
     )
-    print(f'{len(dataset)} cells | classes: {sorted(set(dataset.labels))}')
+    marker_names = list(dataset.used_markers)
+    print(f'  {len(dataset)} cells | {len(marker_names)} markers')
+    print(f'  Classes: {sorted(set(dataset.annotation))}')
 
     loader = DataLoader(
         dataset,
         batch_size  = args.batch_size,
         shuffle     = False,
         num_workers = args.n_workers,
+        collate_fn  = collate,
         pin_memory  = device.type == 'cuda',
     )
 
-    # ── Compute IG ─────────────────────────────────────────────────────────
+    # ── 3. Compute IG + extract features ──────────────────────────────────
     all_attr, all_feats, all_labels, all_sids = [], [], [], []
     n_done = 0
 
@@ -247,35 +262,70 @@ def main():
         if args.max_cells and n_done >= args.max_cells:
             break
         imgs_gpu = imgs.to(device)
-        with torch.no_grad():
-            feats = backbone(imgs_gpu)[0]          # [B, D, 1, 1] or [B, D]
-            feats = feats.flatten(1).cpu().numpy() # [B, D]
         attr = ig_batch(backbone, imgs_gpu, args.n_steps)
+        with torch.no_grad():
+            feats = backbone(imgs_gpu)[0].squeeze(-1).squeeze(-1)  # [B, D]
         all_attr.append(attr.numpy())
-        all_feats.append(feats)
+        all_feats.append(feats.cpu().numpy())
         all_labels.extend(labels)
         all_sids.extend(sids)
         n_done += len(labels)
 
-    attr_matrix = np.concatenate(all_attr,  axis=0)  # [N, n_markers]
-    feat_matrix = np.concatenate(all_feats, axis=0)  # [N, D]
+    attr_matrix = np.concatenate(all_attr,  axis=0)   # [N, n_markers]
+    feat_matrix = np.concatenate(all_feats, axis=0)   # [N, D]
+    labels_arr  = np.array(all_labels)
+    sids_arr    = np.array(all_sids)
     print(f'\nAttribution matrix: {attr_matrix.shape}')
     print(f'Feature matrix:     {feat_matrix.shape}')
 
-    # ── Save ───────────────────────────────────────────────────────────────
+    # ── 4. UMAP coords — load from file or compute from features ──────────
+    if args.umap_emb:
+        print(f'Loading UMAP embeddings from {args.umap_emb}...')
+        emb_data   = np.load(args.umap_emb, allow_pickle=True)
+        umap_all   = emb_data['embedding']      # [N_total, 2]
+        labels_emb = emb_data['labels_str'].astype(str)
+
+        # Apply same annotation_map + ignore to get matching subset
+        ignore_set = set(s.strip() for s in args.ignore.split(',') if s.strip()) \
+                     if args.ignore else set()
+        labels_emb_mapped = np.array([annotation_map.get(l, l) for l in labels_emb])
+        keep       = np.array([l not in ignore_set for l in labels_emb_mapped])
+        umap_coords = umap_all[keep]
+
+        if len(umap_coords) != len(attr_matrix):
+            print(f'WARNING: UMAP has {len(umap_coords)} cells after filtering, '
+                  f'attribution has {len(attr_matrix)}. Check --ignore / --annotation_map.')
+        else:
+            match = np.mean(labels_emb_mapped[keep] == labels_arr)
+            print(f'  Label alignment: {match*100:.1f}% match (should be ~100%)')
+    else:
+        print('No --umap_emb provided — computing UMAP from backbone features...')
+        from sklearn.decomposition import PCA
+        import umap as umap_lib
+        n_pca = min(50, feat_matrix.shape[1])
+        print(f'  PCA {feat_matrix.shape[1]}→{n_pca}...')
+        pca_feats = PCA(n_components=n_pca, random_state=42).fit_transform(feat_matrix)
+        print(f'  UMAP {n_pca}→2 on {len(pca_feats)} cells...')
+        umap_coords = umap_lib.UMAP(n_components=2, n_neighbors=15, min_dist=0.1,
+                                    random_state=42).fit_transform(pca_feats)
+        print(f'  Done. UMAP shape: {umap_coords.shape}')
+
+    # ── 5. Plot ────────────────────────────────────────────────────────────
+    plot_umap_groundtruth(umap_coords, labels_arr, out / 'umap_groundtruth.png')
+    plot_marker_panels(attr_matrix, marker_names, umap_coords, labels_arr,
+                       out / 'umap_marker_influence.png')
+
+    # ── 6. Save ────────────────────────────────────────────────────────────
     np.savez_compressed(
         out / 'attribution.npz',
         attribution  = attr_matrix,
         features     = feat_matrix,
-        labels       = np.array(all_labels),
-        sample_ids   = np.array(all_sids),
+        labels       = labels_arr,
+        sample_ids   = sids_arr,
         marker_names = np.array(marker_names),
+        umap_coords  = umap_coords,
     )
-    with open(out / 'marker_names.txt', 'w') as f:
-        f.write('\n'.join(marker_names))
-
-    print(f'Saved {out}/attribution.npz')
-    print(f'Labels: {sorted(set(all_labels))}')
+    print(f'\nDone. Outputs in {out}')
 
 
 if __name__ == '__main__':

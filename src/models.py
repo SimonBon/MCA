@@ -6,7 +6,7 @@ from mmengine.registry import MODELS
 @MODELS.register_module()
 class WideModel(nn.Module):
     
-    def __init__(self, in_channels, stem_width=16, block_width=4, layer_config=[2, 2], drop_prob=0.05, late_fusion=False, input_norm=False, instance_norm=False):
+    def __init__(self, in_channels, stem_width=16, block_width=4, layer_config=[2, 2], drop_prob=0.05, late_fusion=False, input_norm=False, instance_norm=False, relative_norm=False):
         super().__init__()
 
         self.in_channels = in_channels
@@ -16,6 +16,7 @@ class WideModel(nn.Module):
         self.layer_config = layer_config
         self.drop_prob=drop_prob
         self.input_norm = input_norm
+        self.relative_norm = relative_norm
         self.inst_norm = nn.InstanceNorm2d(in_channels, affine=False) if instance_norm else None
         
         self.stem = nn.Sequential(
@@ -67,7 +68,9 @@ class WideModel(nn.Module):
         if self.inst_norm is not None:
             x = self.inst_norm(x)
 
-        if self.input_norm:
+        if self.relative_norm:
+            x = x / (x.sum(dim=1, keepdim=True) + 1e-8)
+        elif self.input_norm:
             x = F.normalize(x, dim=1)
 
         try:
@@ -818,6 +821,11 @@ class CIM_Funnel(nn.Module):
         mix_channels:       Channel dim for Phase 2. Defaults to in_channels * stem_width.
         drop_prob:          Dropout probability.
         input_norm:         L2-normalise input along channel dim before stem.
+        relative_norm:      Divide each spatial position by its cross-channel sum
+                            before the stem — encodes relative marker expression
+                            (proportions summing to 1) rather than absolute intensities.
+                            More patient-invariant than L2 norm; mutually exclusive
+                            with input_norm.
     """
 
     def __init__(
@@ -830,17 +838,19 @@ class CIM_Funnel(nn.Module):
         mix_channels: int = None,
         drop_prob: float = 0.05,
         input_norm: bool = False,
+        relative_norm: bool = False,
     ):
         super().__init__()
 
         if sep_layer_config is None:
             sep_layer_config = [2, 2]
 
-        self.in_channels = in_channels
+        self.in_channels  = in_channels
         self.stem_width   = stem_width
         self.cim_ch       = in_channels * stem_width
         self.mix_ch       = mix_channels if mix_channels is not None else self.cim_ch
         self.input_norm   = input_norm
+        self.relative_norm = relative_norm
 
         # ── Phase 1: channel-independent ──────────────────────────────────────
         self.stem = nn.Sequential(
@@ -883,7 +893,9 @@ class CIM_Funnel(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, x, *args, **kwargs):
-        if self.input_norm:
+        if self.relative_norm:
+            x = x / (x.sum(dim=1, keepdim=True) + 1e-8)
+        elif self.input_norm:
             x = F.normalize(x, dim=1)
 
         x = self.stem(x)        # [B, C*D, H, W]     — per-marker expansion

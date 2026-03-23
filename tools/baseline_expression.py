@@ -59,8 +59,10 @@ def parse_args():
     p.add_argument('--out',        required=True)
     p.add_argument('--feat',       default='mean', choices=['mean', 'mean+std'])
     p.add_argument('--patch_size', type=int, default=32)
-    p.add_argument('--ignore',     nargs='*', default=['Unidentified'])
-    p.add_argument('--n_jobs',     type=int, default=8)
+    p.add_argument('--ignore',          nargs='*', default=['Unidentified'])
+    p.add_argument('--annotation_map',  default=None,
+                   help='Comma-separated old:new pairs, e.g. "Cytotoxic CD8:CD8,TReg:Treg"')
+    p.add_argument('--n_jobs',          type=int, default=8)
     p.add_argument('--lp_max_iter',type=int, default=5000)
     p.add_argument('--knn_k',      type=int, default=15)
     return p.parse_args()
@@ -150,6 +152,12 @@ def main():
         print(f'Removing {(~keep).sum()} for {cls}')
     dim1, dim2, sample_ids, annotations = (
         dim1[keep], dim2[keep], sample_ids[keep], annotations[keep])
+
+    # ── Annotation map ────────────────────────────────────────────────────────
+    if args.annotation_map:
+        amap = dict(pair.split(':') for pair in args.annotation_map.split(','))
+        annotations = np.array([amap.get(a, a) for a in annotations])
+        print(f'annotation_map applied: {amap}')
 
     # ── Train / val split ─────────────────────────────────────────────────────
     train_idx = np.loadtxt(args.train, dtype=int)

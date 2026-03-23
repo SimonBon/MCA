@@ -83,17 +83,18 @@ class EvaluateModelRich(Hook):
         base_dataloader = dict(
             batch_size=32,
             num_workers=16,
-            sampler=dict(type='DefaultSampler', shuffle=True),
             collate_fn=dict(type='default_collate'),
             drop_last=False,
             dataset=None,
         )
 
         self.train_dataloader_cfg = deepcopy(base_dataloader)
+        self.train_dataloader_cfg['sampler'] = dict(type='DefaultSampler', shuffle=True)
         self.train_dataloader_cfg['dataset'] = deepcopy(base_dataset)
         self.train_dataloader_cfg['dataset']['used_indicies'] = self.train_indicies
 
         self.val_dataloader_cfg = deepcopy(base_dataloader)
+        self.val_dataloader_cfg['sampler'] = dict(type='DefaultSampler', shuffle=False)
         self.val_dataloader_cfg['dataset'] = deepcopy(base_dataset)
         self.val_dataloader_cfg['dataset']['used_indicies'] = self.val_indicies
 
@@ -738,7 +739,8 @@ class EvaluateModelRich(Hook):
             np.savez_compressed(f'{work_dir}/umap_embeddings.npz',
                                 embedding=val_emb,
                                 labels_num=val_labels,
-                                labels_str=val_labels_str)
+                                labels_str=val_labels_str,
+                                sample_ids=val_ids)
             metrics['umap'] = {'saved': True, 'n_neighbors': 15,
                                'min_dist': 0.1, 'metric': 'cosine'}
         else:

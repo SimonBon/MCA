@@ -100,8 +100,8 @@ class MCIDatasetH5(Dataset):
         self.h5_filepath  = h5_filepath
         self.patch_size   = patch_size
         self.half         = patch_size // 2
-        self._h5f         = None   # opened per-worker in __getitem__
-        self._img_cache   = {}     # sample_id → (img_np, mask_np) in-memory cache
+        self._h5f         = None   # opened lazily per worker in __getitem__
+        self._img_shapes  = {}     # sample_id → (H, W) — tiny, safe to cache
 
         with h5py.File(h5_filepath, 'r') as f:
             coords            = f['coords']
@@ -110,6 +110,11 @@ class MCIDatasetH5(Dataset):
             sample_id         = coords['sample_id'][:].astype(str)
             annotation        = f['annotation'][()].astype(str)
             all_markers       = f['marker_names'][:].astype(str)
+            # Read only shapes (not data) for all samples — O(n_samples), not O(pixels)
+            root = 'data' if 'data' in f else None
+            for sid in np.unique(sample_id):
+                grp = f['data'][sid] if root else f[sid]
+                self._img_shapes[sid] = grp['image'].shape[:2]  # (H, W)
 
         # Marker selection
         if used_markers_file is not None:
@@ -147,18 +152,15 @@ class MCIDatasetH5(Dataset):
         return len(self.dim1)
 
     def _open_h5(self):
-        """Open HDF5 lazily (safe for DataLoader workers)."""
+        """Open HDF5 lazily per worker — safe for DataLoader multiprocessing."""
         if self._h5f is None:
             self._h5f = h5py.File(self.h5_filepath, 'r')
 
     def _get_patch(self, dim1, dim2, sample_id):
+        """Read a single cell patch via HDF5 hyperslab — no full-image cache."""
         self._open_h5()
-        if sample_id not in self._img_cache:
-            grp = self._h5f['data'][sample_id] if 'data' in self._h5f else self._h5f[sample_id]
-            self._img_cache[sample_id] = (grp['image'][:], grp['masks'][:])
-        img, mask = self._img_cache[sample_id]
-        H, W = img.shape[0], img.shape[1]
-        half = self.half
+        H, W = self._img_shapes[sample_id]
+        half  = self.half
 
         # Clamp bounds and compute padding
         r0, r1 = dim1 - half, dim1 + half
@@ -168,8 +170,10 @@ class MCIDatasetH5(Dataset):
         r0, r1 = max(0, r0), min(H, r1)
         c0, c1 = max(0, c0), min(W, c1)
 
-        patch = img[r0:r1, c0:c1][:, :, self.marker_idx]   # [h, w, C]
-        msk   = mask[r0:r1, c0:c1]
+        grp   = self._h5f['data'][sample_id] if 'data' in self._h5f else self._h5f[sample_id]
+        # Hyperslab read: only the patch region, then select markers
+        patch = grp['image'][r0:r1, c0:c1, :][:, :, self.marker_idx]  # [h, w, C]
+        msk   = grp['masks'][r0:r1, c0:c1]                             # [h, w]
 
         if any([pr0, pr1, pc0, pc1]):
             patch = np.pad(patch, ((pr0, pr1), (pc0, pc1), (0, 0)))
@@ -246,7 +250,10 @@ def run_evaluation(train_feats, train_labels_str, val_feats, val_labels_str,
                    silhouette_max=10_000,
                    le_fractions=(0.01, 0.1),
                    le_n_per_class=(10, 50, 100, 200, 1000),
-                   skip_label_efficiency=False):
+                   skip_label_efficiency=False,
+                   lp_subsample=None,
+                   lp_max_iter=2000,
+                   lp_C=1.0):
 
     le = LabelEncoder().fit(np.concatenate([train_labels_str, val_labels_str]))
     classes   = list(le.classes_)
@@ -260,9 +267,16 @@ def run_evaluation(train_feats, train_labels_str, val_feats, val_labels_str,
 
     # ── Linear probe ────────────────────────────────────────────────────────
     print('  Linear probe...')
-    clf = LogisticRegression(solver='lbfgs', penalty='l2', max_iter=2000,
-                             class_weight='balanced', C=1, n_jobs=n_jobs, tol=1e-6)
-    clf.fit(train_feats, train_y)
+    if lp_subsample is not None and lp_subsample < len(train_feats):
+        rng_lp = np.random.default_rng(0)
+        idx_lp = rng_lp.choice(len(train_feats), lp_subsample, replace=False)
+        lp_train_feats, lp_train_y = train_feats[idx_lp], train_y[idx_lp]
+        print(f'  LP subsample: {lp_subsample} / {len(train_feats)} train cells')
+    else:
+        lp_train_feats, lp_train_y = train_feats, train_y
+    clf = LogisticRegression(solver='lbfgs', penalty='l2', max_iter=lp_max_iter,
+                             class_weight='balanced', C=lp_C, n_jobs=n_jobs, tol=1e-6)
+    clf.fit(lp_train_feats, lp_train_y)
     val_pred  = clf.predict(val_feats)
     val_proba = clf.predict_proba(val_feats)
     lp_bal  = float(balanced_accuracy_score(val_y, val_pred))
@@ -352,8 +366,8 @@ def run_evaluation(train_feats, train_labels_str, val_feats, val_labels_str,
     rng2 = np.random.default_rng(0)
 
     def _lp(tr_f, tr_y):
-        c = LogisticRegression(solver='lbfgs', penalty='l2', max_iter=2000,
-                               class_weight='balanced', C=1, n_jobs=n_jobs, tol=1e-6)
+        c = LogisticRegression(solver='lbfgs', penalty='l2', max_iter=lp_max_iter,
+                               class_weight='balanced', C=lp_C, n_jobs=n_jobs, tol=1e-6)
         c.fit(tr_f, tr_y)
         p  = c.predict(val_feats)
         pr = c.predict_proba(val_feats)
@@ -435,20 +449,23 @@ def main():
         epilog=__doc__,
     )
     # Model
-    p.add_argument('--model', required=True,
+    p.add_argument('--model', default=None,
                    choices=['openphenom', 'dinov2_vits14', 'dinov2_vitb14',
-                            'dinov2_vitl14', 'dinov2_vitg14', 'uni'])
+                            'dinov2_vitl14', 'dinov2_vitg14', 'uni'],
+                   help='Required unless --skip_extract is set')
     p.add_argument('--uni_ckpt',       default=None, help='Path to UNI pytorch_model.bin')
     p.add_argument('--openphenom_dir', default=None, help='Local path to OpenPhenom weights')
 
     # Data
-    p.add_argument('--h5',         required=True, help='Path to .h5 file')
+    p.add_argument('--h5',         default=None, help='Path to .h5 file (required unless --skip_extract)')
     p.add_argument('--markers',    default=None,  help='Path to used_markers.txt')
-    p.add_argument('--train_idx',  required=True, help='Path to train.txt indices')
-    p.add_argument('--val_idx',    required=True, help='Path to val.txt indices')
+    p.add_argument('--train_idx',  default=None, help='Path to train.txt indices (required unless --skip_extract)')
+    p.add_argument('--val_idx',    default=None, help='Path to val.txt indices (required unless --skip_extract)')
     p.add_argument('--patch_size', type=int, default=32)
-    p.add_argument('--ignore',     default='',
+    p.add_argument('--ignore',          default='',
                    help='Comma-separated annotation labels to ignore, e.g. "Seg Artifact,Cytotoxic CD8"')
+    p.add_argument('--annotation_map',  default=None,
+                   help='Comma-separated old:new pairs, e.g. "Cytotoxic CD8:CD8,TReg:Treg"')
 
     # Output / hardware
     p.add_argument('--out',          required=True)
@@ -466,6 +483,13 @@ def main():
                    help='Skip GPU extraction if train/val_results.npz already exist')
     p.add_argument('--skip_label_efficiency', action='store_true',
                    help='Skip label-efficiency LP curves (saves ~1-2h on large datasets)')
+    p.add_argument('--lp_subsample',     type=int, default=None,
+                   help='Subsample training set to this many cells for LP fitting only '
+                        '(kNN/clustering still use full train set). Useful for high-dim features.')
+    p.add_argument('--lp_max_iter',      type=int, default=2000,
+                   help='Max iterations for LP solver (default 2000; increase for high-dim features).')
+    p.add_argument('--lp_C',             type=float, default=1.0,
+                   help='Regularization strength C for LP (default 1.0; try 0.1 for high-dim features).')
     args = p.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -527,12 +551,22 @@ def main():
                  classes=le_enc.classes_, sample_ids=val_sids)
         print(f'\nFeatures saved → {args.out}')
 
+    # ── Apply annotation_map before evaluation ────────────────────────────
+    if args.annotation_map:
+        amap = dict(pair.split(':') for pair in args.annotation_map.split(','))
+        train_labels_str = np.array([amap.get(l, l) for l in train_labels_str])
+        val_labels_str   = np.array([amap.get(l, l) for l in val_labels_str])
+        print(f'annotation_map applied: {amap}')
+
     # ── Evaluation ────────────────────────────────────────────────────────
     print('\nRunning evaluation...')
     run_evaluation(train_feats, train_labels_str,
                    val_feats,   val_labels_str, val_sids,
                    work_dir=args.out, n_jobs=args.n_jobs,
-                   skip_label_efficiency=args.skip_label_efficiency)
+                   skip_label_efficiency=args.skip_label_efficiency,
+                   lp_subsample=args.lp_subsample,
+                   lp_max_iter=args.lp_max_iter,
+                   lp_C=args.lp_C)
     print(f'\nDone. Results in {args.out}')
 
 

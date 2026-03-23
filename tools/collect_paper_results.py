@@ -18,7 +18,7 @@ ROOT    = Path('/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean')
 OUT_CSV = Path('/nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean/results.csv')
 
 DATASETS = ['CODEX_cHL', 'CODEX_cHL_KRONOS18', 'MIBI_TNBC', 'IMC_NB_TumorSub']
-MODELS   = ['CIM', 'CIM_LateFusion', 'CIM_Funnel_Large', 'ResNet']
+MODELS   = ['CIM', 'CIM_LateFusion', 'CIM_Funnel_Large', 'ResNet', 'ResNet18']
 
 
 def load(path):

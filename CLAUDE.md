@@ -189,14 +189,81 @@ Excel: `paper_results.xlsx` (synced locally; 8 sheets including `_AP` per-class 
 ### ExprBaseline
 Mean marker intensity per cell (scalar per marker → `[n_markers]` feature vector). CPU-only, produced by `tools/baseline_expression.py`. Results stored in `paper_clean/<DATASET>/ExprBaseline/` (single split) or `paper_clean/<DATASET>/ExprBaseline/fold_<k>/` (CV). Loaded into Excel via `EXTERNAL_MODELS` dict in `make_paper_excel.py`.
 
+### KRONOS (foundation model — completed)
+
+KRONOS (arXiv:2506.03373, `hf_hub:MahmoodLab/kronos`) is a ViT-S/16 pretrained on SPM-47M multiplexed imaging data. It is **natively multi-channel** and the correct external baseline to compare against.
+
+**Repo:** `/home/sgutwein/src/KRONOS` (also locally at `/Users/simon.gutwein/src/KRONOS`)
+**Script:** `tools/baseline_kronos.py`
+**Smoke test:** `tools/test_kronos_smoke.py`
+**Marker metadata:** downloaded from HuggingFace → `model_assets/kronos/.../marker_metadata.csv` (177 markers with pretrained IDs, mean, std)
+
+**Architecture:**
+- Input: `[B, C, H, W]` — any number of markers, H = W must be divisible by 16
+- PatchEmbed: processes each marker channel independently (Conv2d with `in_chans=1`), concatenates → `[B, C×N_patches, D]`
+- Sinusoidal marker embeddings added by `marker_id` — **use real IDs from marker_metadata.csv, not sequential**
+- Transformer self-attention operates over ALL tokens across ALL markers → full cross-marker interaction
+- Positional embeddings bicubic-interpolated → works for any input size; **use 64×64 patches** (4×4=16 tokens/marker, close to pretraining)
+- Outputs: `patch_features [B,384]` (CLS), `marker_features [B,C,384]` (per-marker), `token_features [B,C,h,w,384]`
+- **Use `marker_features.flatten()` → [B, C×384] as the cell feature** — matches KRONOS tutorial for cell phenotyping
+- Feature dim scales with markers: 18×384=6912 (KRONOS18), 41×384=15744 (full panel)
+
+**Critical preprocessing (must match KRONOS tutorial exactly):**
+1. Divide raw intensities by `marker_max_values` (65535 for uint16; **1.0 if data already in [0,1]**)
+2. Per-marker `(x - mean) / std` — use official stats from `marker_metadata.csv` for known markers, compute from training cells for unknowns
+3. Multiply by binary cell mask to zero out non-cell pixels: `patch = patch * cell_mask`
+4. Pass `marker_ids` as `[B, C]` int64 tensor
+
+**Marker ID resolution (`load_marker_meta` in baseline_kronos.py):**
+- 177 markers in SPM-47M metadata; our markers are matched by name (uppercase)
+- Name aliases handle mismatches: `DAPI-01→DAPI`, `Cytokeritin→CYTOKERATIN`, `HLA-DR→HLA_DR`, `PD-1→PD1`, `GranzymeB→GZMB`, etc.
+- Markers not in metadata get sequential fallback IDs (4, 5, ...) and data-computed stats
+- For a new dataset: check coverage with `marker_metadata.csv`, add aliases to `ALIASES` dict in `load_marker_meta` for any name mismatches
+
+**Running on a new dataset:**
+1. Check which markers are in `marker_metadata.csv`: `df[df['marker_name'].str.upper().isin([m.upper() for m in your_markers])]`
+2. Add name aliases to `ALIASES` dict in `load_marker_meta` for any mismatches
+3. Set `--marker_max_values 1.0` if data is already float [0,1], else `65535`
+4. Set `--ignore` and `--annotation_map` to match the other models for that dataset
+5. Copy `slurm_baseline_kronos_cHL.sh`, update paths/dataset, submit
+
+**Results location:** `paper_clean/<DATASET>/KRONOS/`
+**Completed runs:** CODEX_cHL (41 markers, LP=0.751) and CODEX_cHL_KRONOS18 (18 markers, LP=0.749)
+
 ### DINOv2 / UNI / CA-MAE (KRONOS paper description)
-The KRONOS paper (arXiv:2506.03373) uses these external models as follows — **note: our implementation differs** (see below):
+The KRONOS paper uses these external models as follows — **note: our implementation differs** (see below):
 
 **DINOv2 (ViT-L/14)** and **UNI (ViT-L/16)**: Each marker channel is individually replicated to 3×RGB and passed through the model. The CLS token is extracted per marker and concatenated → feature vector of size `1024 × M`. Images are center-cropped to multiples of the patch token size (14px). Marker channels normalised with marker-specific mean/std from SPM-47M dataset.
 
 **CA-MAE**: Channel-agnostic masked autoencoder pretrained on fluorescence cell profiling (RxRx360 + JUMP-CP). Accepts arbitrary channel counts natively. Marker-wise embeddings of size `384 × M`.
 
-**Our implementation** (`src/models_external.py`) differs: we use a single-channel `patch_embed.proj` (Conv2d 1→D), process all markers as a joint token sequence with shared positional embeddings tiled C times, and return a **single CLS token** rather than per-marker CLS + concat. This allows cross-marker attention in the ViT but produces lower-dimensional features (`D` vs `1024×M`). Results were poor; models removed from paper Excel pending reassessment of implementation.
+**Our implementation** (`src/models_external.py`) now matches the paper: original 3-channel `patch_embed.proj` is kept unchanged; each marker channel is replicated to 3×RGB and passed independently through the frozen ViT; per-marker CLS tokens are concatenated → `[B, D*C, 1, 1]`. No cross-marker interaction. Feature dim scales with C: 1024×M for DINOv2-L/UNI. Use `tools/extract_external_features.py` to run evaluation.
+
+## Marker Attribution & Module Scoring
+
+Integrated Gradients (IG) attribution + UCell-style module scoring for biological validation.
+Completed for CODEX_cHL (41 markers) and CODEX_cHL_KRONOS18 (18 markers), both using CIM_Funnel_Large.
+
+**Scripts:**
+- `tools/marker_attribution.py` — computes IG attribution per cell, saves `attribution.npz`
+- `tools/module_score_attribution.py` — scores cell type modules, assigns labels, plots UMAPs
+
+**Attribution outputs:**
+- Full panel: `z_RUNS/marker_attribution/CODEX_cHL_CIM_Funnel/attribution.npz`
+- KRONOS18:   `z_RUNS/marker_attribution/CODEX_cHL_KRONOS18_CIM_Funnel_Large/attribution.npz`
+
+**Clean module scoring outputs (paper-ready):**
+- `paper_clean/CODEX_cHL/CIM_Funnel_Large/module_scoring/`
+- `paper_clean/CODEX_cHL_KRONOS18/CIM_Funnel_Large/module_scoring/`
+
+Each folder: `attribution.npz`, `module_scores.npz`, `modules.csv`, `umap_marker_attribution.png`, `umap_module_scores.png`, `umap_gt_vs_assigned.png`, `umap_assigned_celltypes.png`
+
+**Key flags for module_score_attribution.py:**
+- `--data_driven` → DATA_DRIVEN_MODULES (41-marker panel, biologically validated)
+- `--kronos18`    → KRONOS18_MODULES (18-marker panel)
+- `--umap_emb`    → fallback UMAP coords if attribution.npz lacks `umap_coords`
+
+**Important:** `find_latest_timestamp_folder` in `src/utils.py` picks the most recently modified subdir of `model_dir`. Never put attribution/module_scoring output dirs inside the model dir — they will break `load_checkpoint`.
 
 ## Ablation Experiments
 

@@ -24,7 +24,7 @@ import pandas as pd
 ROOT        = Path(__file__).parent.parent / 'z_RUNS' / 'paper_clean'
 LOCAL_ZRUNS = Path(__file__).parent.parent / 'z_RUNS'
 CSV         = ROOT / 'results.csv'
-XLSX        = Path(__file__).parent.parent / 'paper_results.xlsx'
+XLSX        = ROOT / 'paper_results.xlsx'
 
 METRICS = ['lp_balanced', 'lp_macro_f1', 'lp_map', 'knn_balanced',
            'nmi', 'ari', 'clisi_norm', 'ilisi_norm']
@@ -40,7 +40,7 @@ METRIC_LABELS = {
     'ilisi_norm':   'iLISI (norm)',
 }
 
-MODEL_ORDER = ['CIM', 'CIM_LateFusion', 'CIM_Funnel_Large', 'ResNet']
+MODEL_ORDER = ['CIM', 'CIM_LateFusion', 'CIM_Funnel_Large', 'ResNet', 'ResNet18']
 DATASETS    = ['CODEX_cHL', 'CODEX_cHL_KRONOS18', 'MIBI_TNBC', 'IMC_NB_TumorSub']
 
 # ── Annotation maps (same as training configs) ────────────────────────────────
@@ -52,8 +52,14 @@ ANNOTATION_MAPS = {
     'IMC_NB_TumorSub':    {},
 }
 
-# Classes to drop from external runs (noise / artefact labels)
-IGNORE_CLASSES = {'Seg Artifact', 'Unidentified'}
+# Classes to drop from external runs (noise / artefact labels).
+# Dataset-specific: CODEX_cHL models include "Other" in their eval; IMC/MIBI do not.
+IGNORE_CLASSES = {
+    'CODEX_cHL':          {'Seg Artifact', 'Unidentified'},
+    'CODEX_cHL_KRONOS18': {'Seg Artifact', 'Unidentified'},
+    'MIBI_TNBC':          {'Seg Artifact', 'Unidentified', 'Other'},
+    'IMC_NB_TumorSub':    {'Seg Artifact', 'Unidentified', 'Other'},
+}
 
 # ── External model locations ───────────────────────────────────────────────────
 # Single-split models loaded from LOCAL_ZRUNS (old-format metrics.json).
@@ -62,16 +68,24 @@ IGNORE_CLASSES = {'Seg Artifact', 'Unidentified'}
 # folder_or_None=None means load from paper_clean (CV, fold-averaged).
 EXTERNAL_MODELS = {
     'CODEX_cHL': [
-        ('ExprBaseline', None),   # paper_clean/CODEX_cHL/ExprBaseline/metrics.json
+        ('ExprBaseline', None),
+        ('KRONOS',       None),
+        ('UNI',          None),
     ],
     'CODEX_cHL_KRONOS18': [
-        ('ExprBaseline', None),   # paper_clean/CODEX_cHL_KRONOS18/ExprBaseline/metrics.json
+        ('ExprBaseline', None),
+        ('KRONOS',       None),
+        ('UNI',          None),
     ],
     'MIBI_TNBC': [
-        ('ExprBaseline', None),   # paper_clean/MIBI_TNBC/ExprBaseline/fold_*/metrics.json
+        ('ExprBaseline', None),
+        ('KRONOS',       None),
+        ('UNI',          None),
     ],
     'IMC_NB_TumorSub': [
-        ('ExprBaseline', None),   # paper_clean/IMC_NB_TumorSub/ExprBaseline/fold_*/metrics.json
+        ('ExprBaseline', None),
+        ('KRONOS',       None),
+        ('UNI',          None),
     ],
 }
 
@@ -170,7 +184,7 @@ def load_external_metrics(ds_name, folder):
         return None
     d = json.load(open(p))
     amap   = ANNOTATION_MAPS.get(ds_name, {})
-    ignore = IGNORE_CLASSES
+    ignore = IGNORE_CLASSES.get(ds_name, set())
 
     # Old flat format: top-level 'val' key
     if 'val' in d and isinstance(d['val'], dict) and 'lp_balanced_accuracy' in d['val']:
@@ -229,14 +243,27 @@ def load_external_metrics_paper_clean(ds_name, model_name):
             continue
         d = json.load(open(p))
         amap   = ANNOTATION_MAPS.get(ds_name, {})
-        ignore = IGNORE_CLASSES
+        ignore = IGNORE_CLASSES.get(ds_name, set())
 
-        lp_val = d.get('linear_probe', {}).get('val', {})
-        knn    = d.get('knn', {}).get('val', {}).get('top1_balanced_accuracy', '')
-        clus   = d.get('clustering', {}).get('val', {})
-        cl     = d.get('clisi', {})
-        il     = d.get('ilisi', {})
-        pc_raw = lp_val.get('per_class_ap', {})
+        # Handle both new nested format (EvaluateModelRich / baseline_kronos)
+        # and old flat format (extract_external_features.py)
+        if 'linear_probe' in d:
+            lp_val = d.get('linear_probe', {}).get('val', {})
+            knn    = d.get('knn', {}).get('val', {}).get('top1_balanced_accuracy', '')
+            clus   = d.get('clustering', {}).get('val', {})
+            cl     = d.get('clisi', {})
+            il     = d.get('ilisi', {})
+            pc_raw = lp_val.get('per_class_ap', {})
+        else:
+            # Old flat format produced by extract_external_features.py
+            val    = d.get('val', {})
+            lp_val = {'top1_balanced_accuracy': val.get('lp_balanced_accuracy', ''),
+                      'f1': '', 'per_class_ap': val.get('per_class_ap', {})}
+            knn    = val.get('knn_balanced_accuracy', '')
+            clus   = {'nmi': val.get('nmi', ''), 'ari': val.get('ari', '')}
+            cl     = {}
+            il     = {}
+            pc_raw = val.get('per_class_ap', {})
         pc     = _normalise_class_names(pc_raw, amap, ignore)
 
         for cls, ap in pc.items():
@@ -261,7 +288,7 @@ def load_external_metrics_paper_clean(ds_name, model_name):
     # Store per-fold lists so build_summary_table can compute mean±std
     result = {k: v for k, v in scalar_vals.items()}
     result['per_class_ap'] = {cls: float(np.mean(v)) for cls, v in all_pc.items()}
-    result['n_classes']    = len(all_pc)
+    result['n_classes'] = len(all_pc)
     return result
 
 
@@ -370,7 +397,7 @@ def build_per_class_table(ds_name):
             row[name] = f'{v:.4f}' if isinstance(v, float) else ''
         if kronos_ap:
             v = kronos_ap.get(cls, '')
-            row['KRONOS'] = f'{v:.4f}' if isinstance(v, float) else ''
+            row['KRONOS (paper)'] = f'{v:.4f}' if isinstance(v, float) else ''
         rows_out.append(row)
 
     # Mean (mAP) row
@@ -382,7 +409,7 @@ def build_per_class_table(ds_name):
         vals = [v for v in ap_dict.values() if isinstance(v, float)]
         mean_row[name] = f'{np.mean(vals):.4f}' if vals else ''
     if kronos_ap:
-        mean_row['KRONOS'] = f"{np.mean(list(kronos_ap.values())):.4f}"
+        mean_row['KRONOS (paper)'] = f"{np.mean(list(kronos_ap.values())):.4f}"
     rows_out.append(mean_row)
 
     return pd.DataFrame(rows_out)

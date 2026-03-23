@@ -14,13 +14,16 @@ source /nobackup/lab_taschner-mandl/simongutwein/miniconda3/etc/profile.d/conda.
 conda activate mca310
 export PYTHONPATH=/home/sgutwein/src:$PYTHONPATH
 
+BASE=/nobackup/lab_taschner-mandl/simongutwein
+
 python /home/sgutwein/src/MCA/tools/marker_attribution.py \
-    --model_dir      /nobackup/lab_taschner-mandl/simongutwein/z_RUNS/paper_clean/CODEX_cHL/CIM_Funnel_Large \
-    --h5             /nobackup/lab_taschner-mandl/simongutwein/h5_files/CODEX_cHL/CODEX_cHL.h5 \
-    --markers        /nobackup/lab_taschner-mandl/simongutwein/h5_files/CODEX_cHL/used_markers.txt \
-    --val            /nobackup/lab_taschner-mandl/simongutwein/h5_files/CODEX_cHL/test.txt \
-    --out            /nobackup/lab_taschner-mandl/simongutwein/z_RUNS/marker_attribution/CODEX_cHL_CIM_Funnel \
+    --model_dir      $BASE/z_RUNS/paper_clean/CODEX_cHL/CIM_Funnel_Large \
+    --h5             $BASE/h5_files/CODEX_cHL/CODEX_cHL.h5 \
+    --markers        $BASE/h5_files/CODEX_cHL/used_markers.txt \
+    --val            $BASE/h5_files/CODEX_cHL/test.txt \
+    --umap_emb       $BASE/z_RUNS/paper_clean/CODEX_cHL/CIM_Funnel_Large/umap_embeddings.npz \
+    --out            $BASE/z_RUNS/marker_attribution/CODEX_cHL_CIM_Funnel \
     --annotation_map "Cytotoxic CD8:CD8,TReg:Treg" \
-    --ignore         "Seg Artifact,Unidentified,Other" \
+    --ignore         "Other,Seg Artifact" \
     --n_steps        20 \
     --batch_size     64

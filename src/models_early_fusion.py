@@ -196,6 +196,87 @@ class MidFusionModel(nn.Module):
         return (x,)
 
 
+class BasicBlock(nn.Module):
+    """Standard ResNet BasicBlock with skip connection."""
+
+    def __init__(self, in_ch: int, out_ch: int, stride: int = 1, drop_prob: float = 0.0):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_ch, out_ch, 3, stride=stride, padding=1, bias=False)
+        self.bn1   = nn.BatchNorm2d(out_ch)
+        self.relu  = nn.ReLU(inplace=True)
+        self.drop  = nn.Dropout2d(drop_prob) if drop_prob > 0 else nn.Identity()
+        self.conv2 = nn.Conv2d(out_ch, out_ch, 3, padding=1, bias=False)
+        self.bn2   = nn.BatchNorm2d(out_ch)
+
+        self.downsample = None
+        if stride != 1 or in_ch != out_ch:
+            self.downsample = nn.Sequential(
+                nn.Conv2d(in_ch, out_ch, 1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_ch),
+            )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        identity = x
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.drop(out)
+        out = self.bn2(self.conv2(out))
+        if self.downsample is not None:
+            identity = self.downsample(x)
+        return self.relu(out + identity)
+
+
+@MODELS.register_module()
+class ResNet18(nn.Module):
+    """
+    ResNet18 adapted for multiplexed imaging patches.
+
+    Differences from canonical ResNet18:
+    - Stem: 3×3 conv stride=1 (no 7×7 / MaxPool) — preserves spatial for 24–32px patches
+    - in_channels = number of protein marker channels (not 3)
+    - Output: [B, 512, 1, 1] via AdaptiveAvgPool2d(1)
+    - Kaiming weight init
+
+    Architecture: stem(C→64) → layer1(64→64,s=1) → layer2(64→128,s=2)
+                  → layer3(128→256,s=2) → layer4(256→512,s=2) → avgpool
+    """
+
+    def __init__(self, in_channels: int, drop_prob: float = 0.05):
+        super().__init__()
+        self.stem = nn.Sequential(
+            nn.Conv2d(in_channels, 64, 3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+        )
+        self.layer1 = self._make_layer(64,  64,  blocks=2, stride=1, drop_prob=drop_prob)
+        self.layer2 = self._make_layer(64,  128, blocks=2, stride=2, drop_prob=drop_prob)
+        self.layer3 = self._make_layer(128, 256, blocks=2, stride=2, drop_prob=drop_prob)
+        self.layer4 = self._make_layer(256, 512, blocks=2, stride=2, drop_prob=drop_prob)
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+
+        # Kaiming init
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def _make_layer(self, in_ch: int, out_ch: int, blocks: int, stride: int, drop_prob: float):
+        layers = [BasicBlock(in_ch, out_ch, stride=stride, drop_prob=drop_prob)]
+        for _ in range(1, blocks):
+            layers.append(BasicBlock(out_ch, out_ch, stride=1, drop_prob=drop_prob))
+        return nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor, *args, **kwargs):
+        x = self.stem(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.avgpool(x)
+        return (x,)
+
+
 @MODELS.register_module()
 class ResNetBaseline(nn.Module):
     """
